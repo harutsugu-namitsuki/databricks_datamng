@@ -1,23 +1,21 @@
-flowchart TB
-  subgraph AWS["AWS Account / Region"]
-    subgraph VPC["VPC（Databricks compute と RDS を同居させるのが最も簡単）"]
-      DBXCompute[Databricks Compute\n(EC2 クラスタ)]
-      RDS[(RDS PostgreSQL\nNorthwind)]
-      SGdbx[Security Group: dbx-compute]
-      SGrds[Security Group: rds]
-      DBXCompute --- SGdbx
-      RDS --- SGrds
-      DBXCompute -->|TCP 5432| RDS
-    end
+sequenceDiagram
+  autonumber
+  participant W as Databricks Workflow/Job（毎日）
+  participant I as Ingest（JDBC→Bronze）
+  participant P as RDS Postgres（Northwind）
+  participant B as Bronze Delta（S3）
+  participant T as Transform（Silver/Gold）
+  participant D as DQ Check
+  participant O as Ops Tables（ログ/品質）
+  participant G as Gold Delta（S3）
 
-    S3[(S3 Bucket\nData Lake/Delta)]
-    IAMRole[IAM Role / Instance Profile\nS3 read/write]
-    Secrets[(AWS Secrets Manager\nor Databricks Secret Scope)]
-    Monitor[(監視/通知\nDatabricks Job通知 / CloudWatch等)]
-  end
+  W->>I: run開始（run_id, load_date生成）
+  I->>P: JDBCでテーブル抽出（Customers/Orders/...）
+  I->>B: Bronzeへappend（_load_date,_ingest_ts,_run_id付与）
+  I->>O: ingestion_logに件数/所要時間/成否を記録
 
-  ControlPlane["Databricks Control Plane\n(SaaS)"] --> DBXCompute
-  DBXCompute -->|S3 API| S3
-  DBXCompute --> IAMRole
-  DBXCompute --> Secrets
-  DBXCompute --> Monitor
+  W->>T: Silver/Gold変換を実行
+  T->>G: Gold（mart）生成（上書き/mergeなど方針に従う）
+  T->>D: DQルールを実行（NOT NULL, FK整合, 値域, 件数急変など）
+  D->>O: dq_resultsに結果を記録
+  D-->>W: OKなら成功 / NGなら失敗で停止（通知）
