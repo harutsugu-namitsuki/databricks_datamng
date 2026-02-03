@@ -1,3 +1,4 @@
+```mermaid
 flowchart TB
   subgraph AWS["AWS Account / Region"]
     subgraph VPC["VPC<br/>(Databricks compute と RDS を同居が簡単)"]
@@ -21,3 +22,4 @@ flowchart TB
   DBXCompute --> IAMRole
   DBXCompute --> Secrets
   DBXCompute --> Monitor
+```
