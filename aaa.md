@@ -1,22 +1,23 @@
-flowchart LR
-  src[(RDS PostgreSQL\nNorthwind: src)]
-  dbx[Databricks\nNotebooks/Jobs\n(ELT)]
-  s3[(S3 Data Lake\nDelta Lake)]
-  b[Bronze (=raw)\nスナップショット/増分]
-  s[Silver (=stg)\n整形/標準化]
-  g[Gold (=mart)\n集計/提供]
-  ops[(Ops\ningestion_log/dq_results/job_runs/lineage)]
-  cons[利用者\n(Notebook/Databricks SQL/BI)]
-  sec[Secrets\n(DB接続情報)]
-  iam[IAM Role / Instance Profile\n(S3アクセス)]
+flowchart TB
+  subgraph AWS["AWS Account / Region"]
+    subgraph VPC["VPC（Databricks compute と RDS を同居させるのが最も簡単）"]
+      DBXCompute[Databricks Compute\n(EC2 クラスタ)]
+      RDS[(RDS PostgreSQL\nNorthwind)]
+      SGdbx[Security Group: dbx-compute]
+      SGrds[Security Group: rds]
+      DBXCompute --- SGdbx
+      RDS --- SGrds
+      DBXCompute -->|TCP 5432| RDS
+    end
 
-  src -->|JDBC Extract| dbx
-  sec --> dbx
-  iam --> dbx
+    S3[(S3 Bucket\nData Lake/Delta)]
+    IAMRole[IAM Role / Instance Profile\nS3 read/write]
+    Secrets[(AWS Secrets Manager\nor Databricks Secret Scope)]
+    Monitor[(監視/通知\nDatabricks Job通知 / CloudWatch等)]
+  end
 
-  dbx -->|Load| b
-  b -->|Transform| s
-  s -->|Transform| g
-  dbx -->|運用ログ/品質結果| ops
-  g --> cons
-  ops --> cons
+  ControlPlane["Databricks Control Plane\n(SaaS)"] --> DBXCompute
+  DBXCompute -->|S3 API| S3
+  DBXCompute --> IAMRole
+  DBXCompute --> Secrets
+  DBXCompute --> Monitor
