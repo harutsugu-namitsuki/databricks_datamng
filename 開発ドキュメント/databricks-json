@@ -1,0 +1,30 @@
+{
+    "num_workers": 0,
+    "cluster_name": "yuenong.mei.y560@dirbato.co.jp's Cluster",
+    "spark_version": "16.4.x-scala2.12",
+    "spark_conf": {
+        "spark.master": "local[*, 4]",
+        "spark.databricks.cluster.profile": "singleNode"
+    },
+    "azure_attributes": {
+        "first_on_demand": 1,
+        "availability": "SPOT_WITH_FALLBACK_AZURE",
+        "spot_bid_max_price": -1
+    },
+    "node_type_id": "Standard_D4ds_v4",
+    "driver_node_type_id": "Standard_D4ds_v4",
+    "ssh_public_keys": [],
+    "custom_tags": {
+        "ResourceClass": "SingleNode"
+    },
+    "spark_env_vars": {
+        "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+    },
+    "autotermination_minutes": 10,
+    "enable_elastic_disk": true,
+    "init_scripts": [],
+    "enable_local_disk_encryption": false,
+    "data_security_mode": "USER_ISOLATION",
+    "runtime_engine": "STANDARD",
+    "cluster_id": "0207-163857-x50259d0"
+}

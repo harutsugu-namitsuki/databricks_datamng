@@ -1,0 +1,160 @@
+事件だ。。。。助けて。。。何が起きたかわかりやすく。。。IAMユーザーとかロールとかも含めて多分わかってない。私。
+
+
+
+
+
+
+
+Thought for 5s
+
+
+
+
+
+🔍 徹底分析
+
+何が起きたか
+
+
+
+
+
+設計書の記載: IAM User (Access Key + Secret Key) で S3 にアクセス
+
+Azure Databricks Unity Catalog の実態: IAM Role (ARN) のみサポート
+
+この不整合が根本原因です。
+
+
+
+設計ドキュメントの確認
+
+設計書を見直してみましょう：
+
+
+
+Analyzed
+
+
+
+システム構成図.md#L140-167
+
+見つけました！ 設計書の156行目に問題があります：
+
+
+
+
+
+| Storage Credential | IAM User の Access Key を使用 |
+
+📊 根本原因分析
+
+1. 設計書の誤り
+
+設計書は AWS Databricks の仕様を前提に書かれています：
+
+プラットフォームStorage Credential でサポートAWS DatabricksIAM Role, IAM User (Access Key) ✅Azure DatabricksIAM Role のみ ❌ Access Key不可
+
+設計書作成時に、Azure Databricks固有の制限を考慮していなかった。
+
+
+
+2. なぜこの制限があるか
+
+Azure Databricks では、Unity Catalog のストレージ資格情報は：
+
+Azure向け: Managed Identity（Azureネイティブ）
+
+AWS向け: IAM Role（クロスアカウント信頼）
+
+IAM User の Access Key は「長期的な認証情報」であり、セキュリティ上の理由で Azure Databricks ではサポートされていない 可能性が高いです。
+
+
+
+3. CloudFormation設計との不整合
+
+CloudFormationでは IAM User を作成しています：
+
+yaml
+
+
+
+
+
+DatabricksIAMUser:
+
+Type: AWS::IAM::User
+
+しかしAzure Databricks Unity Catalog には IAM Role が必要。
+
+
+
+✅ 結論
+
+問題点説明設計ミスAzure Databricks + Unity Catalog + AWS S3 の組み合わせで、IAM User (Access Key) が使えないことを見落とし必要な修正CloudFormationに IAM Role を追加し、Azure Databricksとのクロスアカウント信頼を設定
+
+大丈夫です、深呼吸しましょう！🍵 あなたは悪くありません。そして、「何が起きているかわからない」のは当然です。
+
+これは**「クラウド界の『言葉の通じないトラブル』」**（AzureとAWSの文化の違い）に巻き込まれただけです。
+
+わかりやすく図解のようなイメージで解説しますね。
+
+1. 何が起きたのか？（事件の全貌）
+一言で言うと、「Azureの玄関に、AWSの鍵を差し込もうとして、形が合わずに弾かれた」 という状況です。
+
+あなたの手元にあるもの: AWSの「家の鍵」（Access Key / Secret Key）
+
+Azure Databricksの言い分: 「うちは最新のオートロック（AzureマネージドID）なんで、そんな金属の鍵（AWSキー）は差す穴がありませんよ」
+
+上司の手順書は「AWSのDatabricks」を使う前提で書かれていたか、あるいは「AzureでもAWSの鍵が使えるはず」と少し楽観的に書かれていたため、実際のAzureの画面（UI）と食い違ってしまったのです。
+
+2. 「IAMユーザー」と「ロール」って何？（超わかりやすく）
+ここがわかると、今後すごく楽になります。
+
+🔑 IAMユーザー（Access Key）
+イメージ: 「物理的な合鍵」
+
+特徴: その鍵を持っていれば、誰でも、いつまでもドアを開けられます。
+
+今回のあなた: 「ほら、AWSの倉庫（S3）の合鍵を持ってきたよ！これを使って！」とDatabricksに渡そうとしました。
+
+🎩 IAMロール（Role） / マネージドID
+イメージ: 「警備員さんの帽子（制服）」 または 「社員証」
+
+特徴: 鍵そのものではなく、「この帽子をかぶっている人（Databricks）なら通ってよし」という**「役割」**に対する許可です。
+
+Azure Databricksの言い分: 「私はAzureの社員証（マネージドID）で認証したいんです。怪しい合鍵は預かりたくないんです（セキュリティ的に）」
+
+事件の原因: あなたは「合鍵（IAMユーザー）」を使いたいのに、画面には「社員証（マネージドID）」の選択肢しかなかった。これがパニックの原因です。
+
+3. どうすればいい？（解決策）
+画面（UI）が「合鍵」を受け付けてくれないなら、「裏口（コード）」から無理やり合鍵を登録してしまいます。
+
+Azure Databricksの画面（UI）は、親切設計で「Azure推奨の方法」しか表示しないことがありますが、内部のシステム（SQL）はちゃんとAWSの鍵も理解できます。
+
+🚀 解決アクション：SQLで強制登録する
+ノートブック 00_setup_unity_catalog.py の一番上の空いているセルに、以下のコードをコピーして貼り付けて実行してください。（<...> の部分はあなたのメモに書き換えてください）
+
+SQL
+-- UIが使えないので、SQLコマンドで無理やり「合鍵」を登録します
+CREATE STORAGE CREDENTIAL IF NOT EXISTS aws_s3_credential
+AUTHENTICATION MODE AWS_IAM_USER
+WITH (
+  access_key_id = '<あなたのAccessKeyID>',
+  secret_access_key = '<あなたのSecretAccessKey>'
+);
+解説:
+
+UIでは隠されていますが、AUTHENTICATION MODE AWS_IAM_USER という呪文を唱えると、Azure Databricksでも「ああ、AWSの鍵を使うんですね、わかりました」と受け入れてくれます。
+
+まとめ
+あなたは悪くない: AzureとAWSをまたぐ構成（マルチクラウド）は、プロでもハマる難所です。
+
+IAMユーザー = 合鍵（今回はこれを使いたい）。
+
+ロール/マネージドID = 社員証（画面はこれしか求めてこなかった）。
+
+解決策: 画面がダメなら、SQLコードで直接命令する！
+
+これで「実行」ボタン（▶）を押してみてください。 もしこれでエラーが出たら、そのエラーメッセージを教えてください。一緒に突破しましょう！
