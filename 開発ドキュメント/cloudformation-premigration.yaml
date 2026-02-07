@@ -1,0 +1,403 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  移行前（暫定構成）: Azure Databricks → AWS クロスクラウド構成
+  - RDS PostgreSQL (Northwind) with public access
+  - S3 Bucket for Delta Lake
+  - IAM User for Azure Databricks access
+  - AWS Secrets Manager for DB credentials
+
+# ============================================
+# Parameters
+# ============================================
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: premigration
+    Description: Environment name for resource naming
+    AllowedValues:
+      - premigration
+      - dev
+      - prod
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block for VPC
+
+  PublicSubnetCidr:
+    Type: String
+    Default: 10.0.0.0/24
+    Description: CIDR block for Public Subnet
+
+  AzureDatabricksIPRange:
+    Type: String
+    Description: Azure Databricks outbound IP range (e.g., 52.168.0.0/16)
+    AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$
+    ConstraintDescription: Must be a valid CIDR notation
+
+  DBName:
+    Type: String
+    Default: northwind
+    Description: PostgreSQL database name
+
+  DBUsername:
+    Type: String
+    Default: dbadmin
+    Description: PostgreSQL master username
+    NoEcho: true
+
+  DBPassword:
+    Type: String
+    Description: PostgreSQL master password (min 8 characters)
+    NoEcho: true
+    MinLength: 8
+
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    Description: RDS instance class
+    AllowedValues:
+      - db.t3.micro
+      - db.t3.small
+      - db.t3.medium
+
+  S3BucketName:
+    Type: String
+    Default: lake-northwind
+    Description: S3 bucket name for Delta Lake
+
+# ============================================
+# Resources
+# ============================================
+Resources:
+  # ========================================
+  # VPC and Networking
+  # ========================================
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-vpc
+
+  # Internet Gateway (📝暗黙 - 必須)
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-igw
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # Public Subnet
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PublicSubnetCidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-subnet
+
+  # RDSのマルチAZ用にもう1つサブネット (必須)
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-subnet-2
+
+  # Route Table (🔧詳細設計 → 実装)
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-rt
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # ========================================
+  # Security Groups
+  # ========================================
+  # RDS Security Group
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-rds-sg
+      GroupDescription: Security group for RDS - Allow PostgreSQL from Azure Databricks
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref AzureDatabricksIPRange
+          Description: PostgreSQL access from Azure Databricks
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-rds-sg
+
+  # ========================================
+  # RDS PostgreSQL
+  # ========================================
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS PostgreSQL
+      DBSubnetGroupName: !Sub ${EnvironmentName}-db-subnet-group
+      SubnetIds:
+        - !Ref PublicSubnet
+        - !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-db-subnet-group
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub ${EnvironmentName}-northwind-db
+      DBName: !Ref DBName
+      Engine: postgres
+      EngineVersion: '16.6'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: 20
+      StorageType: gp3
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: true  # パブリックアクセス有効
+      MultiAZ: false
+      StorageEncrypted: true
+      BackupRetentionPeriod: 0  # 無料枠対応（本番環境では7以上を推奨）
+      DeletionProtection: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-northwind-db
+
+  # ========================================
+  # S3 Bucket (Delta Lake)
+  # ========================================
+  DataLakeBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub ${S3BucketName}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-datalake
+        - Key: Purpose
+          Value: Delta Lake Storage
+
+  # S3 Bucket Policy
+  DataLakeBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataLakeBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt DataLakeBucket.Arn
+              - !Sub ${DataLakeBucket.Arn}/*
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+  # ========================================
+  # IAM User for Azure Databricks
+  # ========================================
+  DatabricksIAMUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub ${EnvironmentName}-databricks-user
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-databricks-user
+        - Key: Purpose
+          Value: Azure Databricks S3 Access
+
+  DatabricksS3Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${EnvironmentName}-databricks-s3-policy
+      Users:
+        - !Ref DatabricksIAMUser
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: S3BucketAccess
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource:
+              - !GetAtt DataLakeBucket.Arn
+              - !Sub ${DataLakeBucket.Arn}/*
+
+  DatabricksAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref DatabricksIAMUser
+
+  # ========================================
+  # AWS Secrets Manager
+  # ========================================
+  DBCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub ${EnvironmentName}/rds/northwind/credentials
+      Description: RDS PostgreSQL credentials for Northwind database
+      SecretString: !Sub |
+        {
+          "username": "${DBUsername}",
+          "password": "${DBPassword}",
+          "engine": "postgres",
+          "host": "${RDSInstance.Endpoint.Address}",
+          "port": 5432,
+          "dbname": "${DBName}"
+        }
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-db-credentials
+
+  # S3アクセス用のシークレット
+  S3AccessSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub ${EnvironmentName}/databricks/s3-credentials
+      Description: IAM User credentials for Azure Databricks S3 access
+      SecretString: !Sub |
+        {
+          "access_key_id": "${DatabricksAccessKey}",
+          "secret_access_key": "${DatabricksAccessKey.SecretAccessKey}",
+          "bucket_name": "${DataLakeBucket}"
+        }
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-s3-credentials
+
+# ============================================
+# Outputs
+# ============================================
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${EnvironmentName}-VpcId
+
+  PublicSubnetId:
+    Description: Public Subnet ID
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub ${EnvironmentName}-PublicSubnetId
+
+  RDSEndpoint:
+    Description: RDS PostgreSQL Endpoint
+    Value: !GetAtt RDSInstance.Endpoint.Address
+    Export:
+      Name: !Sub ${EnvironmentName}-RDSEndpoint
+
+  RDSPort:
+    Description: RDS PostgreSQL Port
+    Value: !GetAtt RDSInstance.Endpoint.Port
+    Export:
+      Name: !Sub ${EnvironmentName}-RDSPort
+
+  RDSConnectionString:
+    Description: JDBC Connection String for RDS
+    Value: !Sub jdbc:postgresql://${RDSInstance.Endpoint.Address}:5432/${DBName}?sslmode=require
+
+  S3BucketName:
+    Description: S3 Data Lake Bucket Name
+    Value: !Ref DataLakeBucket
+    Export:
+      Name: !Sub ${EnvironmentName}-S3BucketName
+
+  S3BucketArn:
+    Description: S3 Data Lake Bucket ARN
+    Value: !GetAtt DataLakeBucket.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-S3BucketArn
+
+  DatabricksIAMUserArn:
+    Description: IAM User ARN for Azure Databricks
+    Value: !GetAtt DatabricksIAMUser.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-DatabricksUserArn
+
+  DatabricksAccessKeyId:
+    Description: Access Key ID for Azure Databricks (store in Databricks Secrets)
+    Value: !Ref DatabricksAccessKey
+
+  DBCredentialsSecretArn:
+    Description: ARN of the DB credentials secret
+    Value: !Ref DBCredentialsSecret
+    Export:
+      Name: !Sub ${EnvironmentName}-DBCredentialsSecretArn
+
+  S3CredentialsSecretArn:
+    Description: ARN of the S3 credentials secret
+    Value: !Ref S3AccessSecret
+    Export:
+      Name: !Sub ${EnvironmentName}-S3CredentialsSecretArn
+
+  SecurityGroupId:
+    Description: RDS Security Group ID
+    Value: !Ref RDSSecurityGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-RDSSecurityGroupId

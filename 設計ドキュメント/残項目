@@ -1,0 +1,4 @@
+8. オープン事項（あなたの環境で確定が必要）
+Databricksが Unity Catalog有効か（SHOW CATALOGS;の結果次第）
+Databricks compute から RDSへのネットワーク到達性
+Databricks compute から S3書込権限（次項のテストで判定）
