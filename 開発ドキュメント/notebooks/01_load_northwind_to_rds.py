@@ -5,77 +5,82 @@
 # MAGIC このノートブックでは、NorthwindサンプルデータをRDS PostgreSQLにロードします。
 # MAGIC 
 # MAGIC **前提条件**:
-# MAGIC - ✅ **Databricks Secrets 設定済み** (`00a_setup_secrets.py` 完了)
 # MAGIC - RDS PostgreSQLが起動している（CloudFormationデプロイ済み）
 # MAGIC - セキュリティグループでDatabricksからの接続が許可されている
-# MAGIC 
-# MAGIC > **⚠️ まだSecretsを設定していない場合**: 先に `00a_setup_secrets.py` を実行してください
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 設定値
+# MAGIC ## ⚠️ 設定値を入力してください
+# MAGIC 
+# MAGIC CloudFormationの出力やAWSコンソールから以下の値を取得して入力してください
 
 # COMMAND ----------
 
-# Secrets設定
-SECRET_SCOPE = "aws-credentials"
-DB_HOST_SECRET = "rds-host"
-DB_USER_SECRET = "rds-username"
-DB_PASSWORD_SECRET = "rds-password"
+# ============================================
+# 👇 ここに実際の値を入力してください 👇
+# ============================================
 
-# データベース設定
+# RDS接続情報（CloudFormation出力から取得）
+DB_HOST = "premigration-northwind-db.cb0as2s6sr83.ap-southeast-2.rds.amazonaws.com"  # RDSEndpoint
+DB_USER = "dbadmin"        # パラメータで設定したDBUsername
+DB_PASSWORD = "Yi2345678"  # パラメータで設定したDBPassword
 DB_NAME = "northwind"
 DB_PORT = 5432
 
+print(f"✅ 設定値")
+print(f"   DB Host: {DB_HOST}")
+print(f"   DB User: {DB_USER}")
+
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## JDBC接続情報の取得
+# MAGIC ## JDBC接続情報の構築
 
 # COMMAND ----------
 
-# Secretsから認証情報を取得
-db_host = dbutils.secrets.get(scope=SECRET_SCOPE, key=DB_HOST_SECRET)
-db_user = dbutils.secrets.get(scope=SECRET_SCOPE, key=DB_USER_SECRET)
-db_password = dbutils.secrets.get(scope=SECRET_SCOPE, key=DB_PASSWORD_SECRET)
-
 # JDBC URL構築
-jdbc_url = f"jdbc:postgresql://{db_host}:{DB_PORT}/{DB_NAME}?sslmode=require"
+jdbc_url = f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
 
 # 接続プロパティ
 connection_properties = {
-    "user": db_user,
-    "password": db_password,
+    "user": DB_USER,
+    "password": DB_PASSWORD,
     "driver": "org.postgresql.Driver"
 }
 
-print(f"JDBC URL: jdbc:postgresql://{db_host}:{DB_PORT}/{DB_NAME}?sslmode=require")
-print(f"User: {db_user}")
+print(f"JDBC URL: {jdbc_url}")
+print(f"✅ 接続情報を構築しました")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Northwind DDL実行
+# MAGIC ## Northwind DDL準備
 # MAGIC 
 # MAGIC RDSに直接接続してテーブルを作成します
 
 # COMMAND ----------
 
-# PostgreSQL JDBC ドライバを使用してDDL実行
-import subprocess
-
 # Northwind DDL（簡易版 - 主要テーブルのみ）
 northwind_ddl = """
--- Categories
-CREATE TABLE IF NOT EXISTS categories (
+-- 既存テーブルを削除（外部キー制約も含めて）
+DROP TABLE IF EXISTS order_details CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS products CASCADE;
+DROP TABLE IF EXISTS employees CASCADE;
+DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS suppliers CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
+
+-- Categories（カテゴリ）
+CREATE TABLE categories (
     category_id SERIAL PRIMARY KEY,
     category_name VARCHAR(50) NOT NULL,
     description TEXT
 );
 
--- Suppliers
-CREATE TABLE IF NOT EXISTS suppliers (
+-- Suppliers（仕入先）
+CREATE TABLE suppliers (
     supplier_id SERIAL PRIMARY KEY,
     company_name VARCHAR(100) NOT NULL,
     contact_name VARCHAR(50),
@@ -89,8 +94,8 @@ CREATE TABLE IF NOT EXISTS suppliers (
     fax VARCHAR(30)
 );
 
--- Products
-CREATE TABLE IF NOT EXISTS products (
+-- Products（製品）
+CREATE TABLE products (
     product_id SERIAL PRIMARY KEY,
     product_name VARCHAR(100) NOT NULL,
     supplier_id INTEGER REFERENCES suppliers(supplier_id),
@@ -103,8 +108,8 @@ CREATE TABLE IF NOT EXISTS products (
     discontinued BOOLEAN DEFAULT FALSE
 );
 
--- Customers
-CREATE TABLE IF NOT EXISTS customers (
+-- Customers（顧客）
+CREATE TABLE customers (
     customer_id VARCHAR(10) PRIMARY KEY,
     company_name VARCHAR(100) NOT NULL,
     contact_name VARCHAR(50),
@@ -118,8 +123,8 @@ CREATE TABLE IF NOT EXISTS customers (
     fax VARCHAR(30)
 );
 
--- Employees
-CREATE TABLE IF NOT EXISTS employees (
+-- Employees（従業員）
+CREATE TABLE employees (
     employee_id SERIAL PRIMARY KEY,
     last_name VARCHAR(50) NOT NULL,
     first_name VARCHAR(50) NOT NULL,
@@ -134,8 +139,8 @@ CREATE TABLE IF NOT EXISTS employees (
     phone VARCHAR(30)
 );
 
--- Orders
-CREATE TABLE IF NOT EXISTS orders (
+-- Orders（注文）
+CREATE TABLE orders (
     order_id SERIAL PRIMARY KEY,
     customer_id VARCHAR(10) REFERENCES customers(customer_id),
     employee_id INTEGER REFERENCES employees(employee_id),
@@ -152,8 +157,8 @@ CREATE TABLE IF NOT EXISTS orders (
     ship_country VARCHAR(50)
 );
 
--- Order Details
-CREATE TABLE IF NOT EXISTS order_details (
+-- Order Details（注文明細）
+CREATE TABLE order_details (
     order_id INTEGER REFERENCES orders(order_id),
     product_id INTEGER REFERENCES products(product_id),
     unit_price DECIMAL(10,2) NOT NULL,
@@ -163,43 +168,55 @@ CREATE TABLE IF NOT EXISTS order_details (
 );
 """
 
-print("DDLを準備しました")
+print("✅ DDLを準備しました")
 print("次のセルでRDSにDDLを実行します")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## DDLをRDSに実行
-# MAGIC 
-# MAGIC **注意**: 以下のセルを実行する前に、psycopg2がインストールされていることを確認してください
+# MAGIC ## PostgreSQLドライバのインストール
 
 # COMMAND ----------
 
-# psycopg2のインストール（必要な場合）
+# psycopg2のインストール
 %pip install psycopg2-binary
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## DDLをRDSに実行
 
 # COMMAND ----------
 
 import psycopg2
 
 # RDSに接続
-conn = psycopg2.connect(
-    host=db_host,
-    port=DB_PORT,
-    database=DB_NAME,
-    user=db_user,
-    password=db_password,
-    sslmode='require'
-)
-conn.autocommit = True
-cursor = conn.cursor()
-
-# DDL実行
-cursor.execute(northwind_ddl)
-print("✅ DDL実行完了: テーブルが作成されました")
-
-cursor.close()
-conn.close()
+try:
+    conn = psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        sslmode='require'
+    )
+    conn.autocommit = True
+    cursor = conn.cursor()
+    
+    # DDL実行
+    cursor.execute(northwind_ddl)
+    print("✅ DDL実行完了: テーブルが作成されました")
+    
+    cursor.close()
+    conn.close()
+    
+except Exception as e:
+    print(f"❌ エラー: {str(e)}")
+    print("\n確認事項:")
+    print("1. DB_HOST, DB_USER, DB_PASSWORD が正しいか")
+    print("2. RDSのセキュリティグループでDatabricks IPからの接続が許可されているか")
+    print("3. RDSがパブリックアクセス可能になっているか")
+    raise e
 
 # COMMAND ----------
 
@@ -277,11 +294,11 @@ ON CONFLICT DO NOTHING;
 
 # RDSに接続してデータ投入
 conn = psycopg2.connect(
-    host=db_host,
+    host=DB_HOST,
     port=DB_PORT,
     database=DB_NAME,
-    user=db_user,
-    password=db_password,
+    user=DB_USER,
+    password=DB_PASSWORD,
     sslmode='require'
 )
 conn.autocommit = True
@@ -303,13 +320,15 @@ conn.close()
 # 各テーブルの件数を確認
 tables = ['categories', 'suppliers', 'customers', 'employees', 'products', 'orders', 'order_details']
 
+print("📊 各テーブルの件数:")
 for table in tables:
     df = spark.read.jdbc(
         url=jdbc_url,
         table=table,
         properties=connection_properties
     )
-    print(f"{table}: {df.count()} 件")
+    count = df.count()
+    print(f"  {table}: {count} 件")
 
 # COMMAND ----------
 

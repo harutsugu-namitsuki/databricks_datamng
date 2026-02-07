@@ -78,8 +78,9 @@ print(f"   IAM Role ARN: {IAM_ROLE_ARN}")
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Northwind用のCatalogを作成
+# MAGIC -- Northwind用のCatalogを作成（メタストアにルート設定がない場合は場所を指定する必要があります）
 # MAGIC CREATE CATALOG IF NOT EXISTS northwind
+# MAGIC MANAGED LOCATION 's3://lake-northwind-312871631496/'
 # MAGIC COMMENT 'Northwind sample data catalog';
 
 # COMMAND ----------

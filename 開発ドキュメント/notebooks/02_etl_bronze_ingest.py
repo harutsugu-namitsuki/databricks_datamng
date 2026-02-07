@@ -13,20 +13,20 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 設定値
+# MAGIC ## ⚠️ 設定値を入力してください
+# MAGIC 
+# MAGIC 01で使用したのと同じRDS接続情報を入力してください
 
 # COMMAND ----------
 
-from datetime import datetime
-from pyspark.sql.functions import lit, current_timestamp
+# ============================================
+# 👇 ここに実際の値を入力してください 👇
+# ============================================
 
-# Secrets設定
-SECRET_SCOPE = "aws-credentials"
-DB_HOST_SECRET = "rds-host"
-DB_USER_SECRET = "rds-username"
-DB_PASSWORD_SECRET = "rds-password"
-
-# データベース設定
+# RDS接続情報（01_load_northwind_to_rds.py と同じ値）
+DB_HOST = "premigration-northwind-db.cb0as2s6sr83.ap-southeast-2.rds.amazonaws.com"  # RDSEndpoint
+DB_USER = "dbadmin"
+DB_PASSWORD = "Yi2345678"
 DB_NAME = "northwind"
 DB_PORT = 5432
 
@@ -45,6 +45,10 @@ SOURCE_TABLES = [
     "order_details"
 ]
 
+print(f"✅ 設定値")
+print(f"   DB Host: {DB_HOST}")
+print(f"   Catalog: {CATALOG}.{BRONZE_SCHEMA}")
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -52,21 +56,16 @@ SOURCE_TABLES = [
 
 # COMMAND ----------
 
-# Secretsから認証情報を取得
-db_host = dbutils.secrets.get(scope=SECRET_SCOPE, key=DB_HOST_SECRET)
-db_user = dbutils.secrets.get(scope=SECRET_SCOPE, key=DB_USER_SECRET)
-db_password = dbutils.secrets.get(scope=SECRET_SCOPE, key=DB_PASSWORD_SECRET)
-
 # JDBC URL構築
-jdbc_url = f"jdbc:postgresql://{db_host}:{DB_PORT}/{DB_NAME}?sslmode=require"
+jdbc_url = f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
 
 connection_properties = {
-    "user": db_user,
-    "password": db_password,
+    "user": DB_USER,
+    "password": DB_PASSWORD,
     "driver": "org.postgresql.Driver"
 }
 
-print(f"✅ JDBC接続準備完了: {db_host}")
+print(f"✅ JDBC接続準備完了: {DB_HOST}")
 
 # COMMAND ----------
 
@@ -83,6 +82,12 @@ print(f"✅ JDBC接続準備完了: {db_host}")
 
 # MAGIC %md
 # MAGIC ## Bronze層へのデータ取り込み
+
+# COMMAND ----------
+
+# 必要なライブラリのインポート
+from datetime import datetime
+from pyspark.sql.functions import lit, current_timestamp
 
 # COMMAND ----------
 
