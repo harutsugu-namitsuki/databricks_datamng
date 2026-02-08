@@ -1,22 +1,22 @@
-# データフロー（移行前：Azure Databricks + Azure ADLS）
+# データフロー（移行前：Azure Databricks → AWS）
 
 移行前（暫定構成）のデータフローを示すシーケンス図です。
-Azure DatabricksからAWS RDSに接続し、Azure ADLS Gen2にデータを保存します。
+Azure DatabricksからAWS RDS/S3に接続するクロスクラウド構成です。
 
 ```mermaid
 sequenceDiagram
   autonumber
   %% --- 登場人物（データ/システム）の定義 ---
-  box "Azure環境" #e3f2fd
+  box "Azure環境 (Databricks)" #e3f2fd
     participant DBX as Azure Databricks<br/>(Compute)
     participant Unity as Unity Catalog<br/>(メタデータ)
-    participant Bronze as Bronze<br/>(ADLS Delta)
-    participant Silver as Silver<br/>(ADLS Delta)
-    participant Gold as Gold<br/>(ADLS Delta)
   end
 
   box "AWS環境" #fff3e0
     participant RDS as RDS<br/>(Northwind)
+    participant Bronze as Bronze<br/>(S3 Delta)
+    participant Silver as Silver<br/>(S3 Delta)
+    participant Gold as Gold<br/>(S3 Delta)
   end
 
   box "Ops & Governance" #e8f5e9
@@ -30,10 +30,10 @@ sequenceDiagram
   DBX->>Unity: 0. テーブル定義確認
   Unity-->>DBX: メタデータ返却
 
-  %% 1. Ingest (RDSからAzureへ)
+  %% 1. Ingest (インターネット経由)
   DBX->>RDS: 1. JDBC接続 (インターネット経由/SSL)
   RDS-->>DBX: データ返却
-  DBX->>Bronze: 2. データ保存 (Managed Identity)
+  DBX->>Bronze: 2. データ保存 (S3 API + Access Key)
   activate Bronze
   Bronze->>Ops: 3. ログ記録 (Ingestion Log)
   DBX->>Unity: 3b. メタデータ登録
@@ -60,10 +60,10 @@ sequenceDiagram
 
 ## 移行前の注意点
 
-1. **Azure内データレイク**: Bronze/Silver/GoldはすべてAzure ADLS Gen2に保存
-2. **RDSへのアクセスはインターネット経由**: RDSのパブリックエンドポイントを使用
+1. **クロスクラウド構成**: Azure Databricks から AWS RDS/S3 に接続
+2. **JDBC接続はインターネット経由**: RDSのパブリックエンドポイントを使用
 3. **SSL必須**: `sslmode=require` を接続文字列に含める
-4. **ADLS接続はManaged Identity**: パスワードレス認証
+4. **S3接続はAccess Key**: IAM User の Access Key を Databricks Secrets に保存
 5. **Unity Catalog**: メタデータ管理とリネージ追跡に使用
 
 ## Unity Catalog の役割
@@ -74,9 +74,3 @@ sequenceDiagram
 | **リネージ** | データの出自・変換履歴 |
 | **アクセス制御** | ユーザー/グループ単位の権限管理 |
 | **データ発見** | カタログ検索によるテーブル発見 |
-
-## 変更履歴
-
-| 日付 | 変更内容 |
-|------|----------|
-| 2024-02-08 | データレイクをAWS S3からAzure ADLS Gen2に変更 |

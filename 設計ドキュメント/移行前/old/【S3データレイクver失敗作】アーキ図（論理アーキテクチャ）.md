@@ -1,7 +1,7 @@
-# 論理アーキテクチャ図（移行前：Azure Databricks + Azure ADLS）
+# 論理アーキテクチャ図（移行前：Azure Databricks → AWS）
 
 このダイアグラムは「**何をどう処理するか**」を示す論理的な構成図です。
-移行前（暫定構成）では、Azure Databricksで処理し、Azure ADLS Gen2にデータを保存します。
+移行前（暫定構成）では、Azure DatabricksからAWSのデータソースに接続します。
 
 ## ステータス凡例
 
@@ -22,12 +22,12 @@ flowchart LR
 
   subgraph ProcessingEngine["処理エンジン (Azure Databricks)"]
     dbx["Databricks<br/>Notebooks/Jobs<br/>(ELT処理)"]
-    identity["Managed Identity<br/>(Access Connector)"]
+    accesskey["Access Key<br/>(IAM Userの認証情報)"]
     secrets["Databricks Secrets<br/>(認証情報管理)"]
     unity[("Unity Catalog<br/>(メタデータ/リネージ)")]
   end
 
-  subgraph DataLake["データレイク (Azure ADLS Gen2)"]
+  subgraph DataLake["データレイク (AWS S3)"]
     b["Bronze<br/>(生データ/スナップショット)"]
     s["Silver<br/>(クレンジング/標準化済)"]
     g["Gold<br/>(集計/マート)"]
@@ -35,7 +35,8 @@ flowchart LR
   end
 
   subgraph Monitoring["監視・運用（🔧詳細設計）"]
-    azmonitor["Azure Monitor<br/>（🔧詳細設計）"]
+    cloudwatch["CloudWatch<br/>（🔧詳細設計）"]
+    sns["SNS<br/>（🔧詳細設計）"]
   end
 
   subgraph Consumers["利用者"]
@@ -44,16 +45,16 @@ flowchart LR
   end
 
   subgraph NotUsed["今回不要なサービス（⛔）"]
-    s3["AWS S3<br/>（⛔ADLSに変更）"]
-    iamrole["IAM Role/User<br/>（⛔ADLSに変更）"]
+    redshift["Redshift/Athena<br/>（⛔不要）"]
+    iamrole["IAM Role<br/>（⛔移行前は不要）"]
   end
 
   %% ============================
   %% データフロー
   %% ============================
   src -->|"1. JDBC抽出<br/>(インターネット経由)"| dbx
-  identity -.->|"ADLS認証"| dbx
-  secrets -.->|"RDS認証情報"| dbx
+  accesskey -.->|"S3認証"| secrets
+  secrets -.->|"認証情報提供"| dbx
 
   dbx -->|"2. Load"| b
   b -->|"3. Transform"| s
@@ -65,7 +66,8 @@ flowchart LR
   unity -.->|"リネージ/アクセス制御"| g
 
   dbx -.->|"ログ/DQ結果"| ops
-  ops -.->|"監視連携"| azmonitor
+  ops -.->|"監視連携"| cloudwatch
+  cloudwatch -.->|"アラート"| sns
 
   g --> analyst
   g --> bi
@@ -78,18 +80,19 @@ flowchart LR
 |---------|------|------|------------|
 | **ソースシステム** | RDS PostgreSQL | Northwindデータベース（AWS） | ✅ |
 | **処理エンジン** | Azure Databricks | ELT処理 | ✅ |
-| | Managed Identity | Access Connector経由のADLS認証 | ✅ |
+| | Access Key | IAM Userの認証情報 | ✅ |
 | | Databricks Secrets | 認証情報の安全な管理 | ✅ |
 | | Unity Catalog | メタデータ/リネージ/アクセス制御 | ✅ |
-| **データレイク** | Bronze | 生データ/スナップショット（ADLS） | ✅ |
-| | Silver | クレンジング/標準化済（ADLS） | ✅ |
-| | Gold | 集計/マート（ADLS） | ✅ |
-| | Ops | ログ/品質/リネージ（ADLS） | ✅ |
-| **監視・運用** | Azure Monitor | ログ・メトリクス・アラート | 🔧詳細設計 |
+| | IAM Role | Instance Profile経由のアクセス | ⛔移行前不要 |
+| **データレイク** | Bronze | 生データ/スナップショット（AWS S3） | ✅ |
+| | Silver | クレンジング/標準化済（AWS S3） | ✅ |
+| | Gold | 集計/マート（AWS S3） | ✅ |
+| | Ops | ログ/品質/リネージ（AWS S3） | ✅ |
+| **監視・運用** | CloudWatch | ログ・メトリクス・アラート | 🔧詳細設計 |
+| | SNS | 通知（メール/Slack等） | 🔧詳細設計 |
 | **利用者** | Analyst | Databricks SQL | ✅ |
 | | BIツール | Tableau等 | ✅ |
-| **今回不要** | AWS S3 | ADLSに変更 | ⛔不要 |
-| | IAM Role/User | ADLSに変更 | ⛔不要 |
+| **今回不要** | Redshift/Athena | Databricksを使用するため | ⛔不要 |
 
 ## 凡例
 
@@ -102,13 +105,8 @@ flowchart LR
 
 ## 移行前の特徴
 
-- **Azure内データレイク**: Bronze/Silver/GoldはすべてAzure ADLS Gen2に保存
+- **クロスクラウド構成**: Azure Databricks から AWS RDS/S3 に接続
 - **JDBC接続**: インターネット経由でRDSに接続（SSL必須）
-- **ADLS接続**: Managed Identity（パスワードレス）
+- **S3接続**: IAM User の Access Key を使用
 - **Unity Catalog**: ✅ 使用可能（メタデータ管理、リネージ、アクセス制御）
-
-## 変更履歴
-
-| 日付 | 変更内容 |
-|------|----------|
-| 2024-02-08 | データレイクをAWS S3からAzure ADLS Gen2に変更 |
+- **監視**: CloudWatch/SNSは詳細設計フェーズで追加予定
