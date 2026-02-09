@@ -1,21 +1,23 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 02. ETL Bronze層：RDS → S3 Delta取り込み
+# MAGIC # 02. ETL Bronze層：RDS → ADLS Gen2取り込み
 # MAGIC 
-# MAGIC このノートブックでは、RDS PostgreSQLからデータを抽出し、Bronze層（S3 Delta）に保存します。
+# MAGIC このノートブックでは、RDS PostgreSQLからデータを抽出し、Bronze層（ADLS Gen2）に保存します。
 # MAGIC 
 # MAGIC **処理内容**:
 # MAGIC - RDSからJDBC経由でデータ取得
 # MAGIC - メタデータ付与（`_load_date`, `_source_system`）
 # MAGIC - Bronze層にDelta形式で保存
 # MAGIC - Unity Catalogにテーブル登録
+# MAGIC 
+# MAGIC **前提条件**:
+# MAGIC - `00_setup_unity_catalog.py` が実行済みであること
+# MAGIC - `01_load_northwind_to_rds.py` でRDSデータが準備されていること
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## ⚠️ 設定値を入力してください
-# MAGIC 
-# MAGIC 01で使用したのと同じRDS接続情報を入力してください
 
 # COMMAND ----------
 
@@ -23,7 +25,8 @@
 # 👇 ここに実際の値を入力してください 👇
 # ============================================
 
-# RDS接続情報（01_load_northwind_to_rds.py と同じ値）
+# RDS接続情報（Secretsから取得することを推奨しますが、簡略化のため直接書く場合は注意）
+# ※本番環境では必ず dbutils.secrets.get() を使用してください
 DB_HOST = "premigration-northwind-db.cb0as2s6sr83.ap-southeast-2.rds.amazonaws.com"  # RDSEndpoint
 DB_USER = "dbadmin"
 DB_PASSWORD = "Yi2345678"
@@ -31,7 +34,7 @@ DB_NAME = "northwind"
 DB_PORT = 5432
 
 # Unity Catalog設定
-CATALOG = "northwind"
+CATALOG = "northwind_catalog" # ADLS用に変更
 BRONZE_SCHEMA = "bronze"
 
 # 処理対象テーブル
@@ -42,7 +45,8 @@ SOURCE_TABLES = [
     "employees",
     "products",
     "orders",
-    "order_details"
+    "order_details",
+    "shippers" # 追加
 ]
 
 print(f"✅ 設定値")
@@ -74,22 +78,21 @@ print(f"✅ JDBC接続準備完了: {DB_HOST}")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC USE CATALOG northwind;
-# MAGIC USE SCHEMA bronze;
+# カタログ・スキーマの存在確認と作成は 00_setup_unity_catalog.py で行われている前提
+
+spark.sql(f"USE CATALOG {CATALOG}")
+spark.sql(f"USE SCHEMA {BRONZE_SCHEMA}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Bronze層へのデータ取り込み
+# MAGIC ## Bronze層へのデータ取り込み関数
 
 # COMMAND ----------
 
 # 必要なライブラリのインポート
 from datetime import datetime
 from pyspark.sql.functions import lit, current_timestamp
-
-# COMMAND ----------
 
 def ingest_to_bronze(table_name: str):
     """
@@ -101,11 +104,15 @@ def ingest_to_bronze(table_name: str):
     print(f"📥 Processing: {table_name}")
     
     # RDSからデータ読み込み
-    df = spark.read.jdbc(
-        url=jdbc_url,
-        table=table_name,
-        properties=connection_properties
-    )
+    try:
+        df = spark.read.jdbc(
+            url=jdbc_url,
+            table=table_name,
+            properties=connection_properties
+        )
+    except Exception as e:
+        print(f"❌ Error reading from RDS table {table_name}: {e}")
+        raise e
     
     # メタデータ付与
     df_with_meta = df \
@@ -113,17 +120,19 @@ def ingest_to_bronze(table_name: str):
         .withColumn("_load_timestamp", current_timestamp()) \
         .withColumn("_source_system", lit("rds_northwind"))
     
-    # Bronze層に保存（Delta形式、Append）
-    bronze_table = f"{CATALOG}.{BRONZE_SCHEMA}.{table_name}"
+    # Bronze層に保存（Delta形式、Overwrite）
+    # ※BronzeはRawデータのスナップショットあるいはAppendとするケースが多いが、
+    # 学習用のためシンプルにOverwrite（洗い替え）とする
+    target_table = f"{CATALOG}.{BRONZE_SCHEMA}.{table_name}"
     
     df_with_meta.write \
         .format("delta") \
         .mode("overwrite") \
         .option("mergeSchema", "true") \
-        .saveAsTable(bronze_table)
+        .saveAsTable(target_table)
     
     record_count = df_with_meta.count()
-    print(f"✅ Completed: {table_name} ({record_count} records)")
+    print(f"✅ Completed: {target_table} ({record_count} records)")
     
     return record_count
 
@@ -172,13 +181,15 @@ display(results_df)
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SHOW TABLES IN northwind.bronze;
+# MAGIC -- 変数がSQLセルで直接使えないため、Python変数を一時ビューなどに渡すか、ハードコードで確認
+# MAGIC -- ここでは SHOW TABLES を実行
+# MAGIC SHOW TABLES IN northwind_catalog.bronze;
 
 # COMMAND ----------
 
 # サンプルデータ確認（orders）
 # MAGIC %sql
-# MAGIC SELECT * FROM northwind.bronze.orders LIMIT 5;
+# MAGIC SELECT * FROM northwind_catalog.bronze.orders LIMIT 5;
 
 # COMMAND ----------
 
@@ -187,6 +198,6 @@ display(results_df)
 # MAGIC 
 # MAGIC - [ ] 全テーブルがBronze層に取り込まれた
 # MAGIC - [ ] メタデータ（`_load_date`, `_source_system`）が付与されている
-# MAGIC - [ ] Unity Catalogに登録されている
+# MAGIC - [ ] Unity Catalog (`northwind_catalog.bronze.*`) に登録されている
 # MAGIC 
 # MAGIC 次のステップ: `03_etl_silver_transform.py` でSilver層への変換を実行します

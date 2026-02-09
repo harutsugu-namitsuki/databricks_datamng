@@ -1,149 +1,149 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 00. Unity Catalog セットアップ
+# MAGIC # 00. Unity Catalog セットアップ (Azure ADLS Gen2)
 # MAGIC 
 # MAGIC このノートブックでは以下を設定します：
-# MAGIC 1. Storage Credential（IAM Role経由でS3アクセス）
-# MAGIC 2. External Location（S3バケット）
+# MAGIC 1. Storage Credential（Access Connector経由でADLSアクセス）
+# MAGIC 2. External Location（ADLS Gen2 コンテナ）
 # MAGIC 3. Catalog / Schema 作成
+# MAGIC 
+# MAGIC **前提条件**:
+# MAGIC - Azure ADLS Gen2 ストレージアカウント作成済み
+# MAGIC - Access Connector 作成済み
+# MAGIC - Access Connector (Managed Identity) に `Storage Blob Data Contributor` 権限付与済み
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 前提条件
-# MAGIC - AWS CloudFormation スタックがデプロイ済み（IAM Role作成済み）
-# MAGIC - Unity Catalog のメタストアがワークスペースに紐づけ済み
-# MAGIC - Account Admin または Metastore Admin 権限が必要
+# 設定値（Azureリソース構築結果を入力）
+STORAGE_ACCOUNT_NAME = "lakenorthwindharu"  # 作成したストレージアカウント名
+ACCESS_CONNECTOR_ID = "/subscriptions/5b579d74-3de4-469b-8f70-b2acb7b2f369/resourceGroups/rg-northwind-datalake/providers/Microsoft.Databricks/accessConnectors/adb-access-connector-northwind" # Access ConnectorのリソースID
 
-# COMMAND ----------
+# 固定値
+STORAGE_CREDENTIAL_NAME = "azure_adls_credential"
+CATALOG_NAME = "northwind_catalog"
 
-# 設定値（CloudFormation出力から取得）
-AWS_ACCOUNT_ID = "312871631496"  # あなたのAWSアカウントID
-S3_BUCKET_NAME = f"lake-northwind-{AWS_ACCOUNT_ID}"
-IAM_ROLE_ARN = f"arn:aws:iam::{AWS_ACCOUNT_ID}:role/premigration-databricks-unity-role"
-STORAGE_CREDENTIAL_NAME = "aws_s3_credential"
-EXTERNAL_LOCATION_NAME = "northwind_datalake"
-CATALOG_NAME = "northwind"
+# ADLSパス (abfss形式)
+ADLS_ROOT_PATH = f"abfss://bronze@{STORAGE_ACCOUNT_NAME}.dfs.core.windows.net/"
 
 print(f"✅ 設定値")
-print(f"   S3バケット: {S3_BUCKET_NAME}")
-print(f"   IAM Role ARN: {IAM_ROLE_ARN}")
+print(f"   Storage Account: {STORAGE_ACCOUNT_NAME}")
+print(f"   Access Connector ID: {ACCESS_CONNECTOR_ID}")
+print(f"   Root Path: {ADLS_ROOT_PATH}")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Step 1: Storage Credential 作成
 # MAGIC 
-# MAGIC **⚠️ 注意**: このステップは **Databricks UI** で実行してください
+# MAGIC **重要**: 以下のSQLを実行する前に、**Databricks UI** でStorage Credentialを作成するか、以下のSQLを実行してください。
+# MAGIC ※Databricks on AzureではSQLで作成可能です。
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Storage Credentialを作成
+# MAGIC -- 注意: 既存の場合は一度削除するか、SKIPしてください
+# MAGIC -- DROP STORAGE CREDENTIAL IF EXISTS azure_adls_credential;
 # MAGIC 
-# MAGIC **手順**:
-# MAGIC 1. Databricks UI左メニュー → **Catalog** をクリック
-# MAGIC 2. 右上の **⚙️ (歯車)** → **資格情報** を選択
-# MAGIC 3. **資格情報を作成** をクリック
-# MAGIC 4. 以下を入力:
-# MAGIC    - **資格情報のタイプ**: `AWS IAMロール` を選択
-# MAGIC    - **Name**: `aws_s3_credential`
-# MAGIC    - **IAMロール (ARN)**: 上のセルで表示された `IAM_ROLE_ARN` の値を入力
-# MAGIC 5. **作成** をクリック
-# MAGIC 
-# MAGIC > **📝 ARNの例**: `arn:aws:iam::312871631496:role/premigration-databricks-unity-role`
+# MAGIC CREATE STORAGE CREDENTIAL IF NOT EXISTS azure_adls_credential
+# MAGIC WITH (
+# MAGIC   AZURE_MANAGED_IDENTITY_ACCESS_CONNECTOR_ID = '/subscriptions/5b579d74-3de4-469b-8f70-b2acb7b2f369/resourceGroups/rg-northwind-datalake/providers/Microsoft.Databricks/accessConnectors/adb-access-connector-northwind'
+# MAGIC );
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Step 2: External Location 作成
 # MAGIC 
-# MAGIC Storage Credential作成後、以下のSQLを実行してください
+# MAGIC 各コンテナ（bronze, silver, gold）に対してExternal Locationを作成します。
+# MAGIC ※ここではルートとして `bronze` コンテナを例に作成しますが、本来はコンテナごとに作成するか、共通のルートパスを指定します。
+# MAGIC 今回はシンプルに `bronze` コンテナを `ext_bronze` として定義し、他の層も同様に定義します。
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- External Location を作成
-# MAGIC CREATE EXTERNAL LOCATION IF NOT EXISTS northwind_datalake
-# MAGIC URL 's3://lake-northwind-312871631496/'
-# MAGIC WITH (STORAGE CREDENTIAL aws_s3_credential)
-# MAGIC COMMENT 'Northwind Data Lake on AWS S3';
+# MAGIC -- Bronze用
+# MAGIC CREATE EXTERNAL LOCATION IF NOT EXISTS ext_bronze
+# MAGIC URL 'abfss://bronze@lakenorthwindharu.dfs.core.windows.net/'
+# MAGIC WITH (STORAGE CREDENTIAL azure_adls_credential)
+# MAGIC COMMENT 'Bronze Layer';
+# MAGIC 
+# MAGIC -- Silver用
+# MAGIC CREATE EXTERNAL LOCATION IF NOT EXISTS ext_silver
+# MAGIC URL 'abfss://silver@lakenorthwindharu.dfs.core.windows.net/'
+# MAGIC WITH (STORAGE CREDENTIAL azure_adls_credential)
+# MAGIC COMMENT 'Silver Layer';
+# MAGIC 
+# MAGIC -- Gold用
+# MAGIC CREATE EXTERNAL LOCATION IF NOT EXISTS ext_gold
+# MAGIC URL 'abfss://gold@lakenorthwindharu.dfs.core.windows.net/'
+# MAGIC WITH (STORAGE CREDENTIAL azure_adls_credential)
+# MAGIC COMMENT 'Gold Layer';
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- External Location の確認
+# MAGIC -- 確認
 # MAGIC SHOW EXTERNAL LOCATIONS;
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Step 3: Catalog 作成
+# MAGIC 
+# MAGIC `northwind_catalog` を作成します。
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Northwind用のCatalogを作成（メタストアにルート設定がない場合は場所を指定する必要があります）
-# MAGIC CREATE CATALOG IF NOT EXISTS northwind
-# MAGIC MANAGED LOCATION 's3://lake-northwind-312871631496/'
-# MAGIC COMMENT 'Northwind sample data catalog';
+# MAGIC CREATE CATALOG IF NOT EXISTS northwind_catalog
+# MAGIC MANAGED LOCATION 'abfss://bronze@lakenorthwindharu.dfs.core.windows.net/managed'
+# MAGIC COMMENT 'Northwind Data Lake Catalog';
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Catalogを使用
-# MAGIC USE CATALOG northwind;
+# MAGIC USE CATALOG northwind_catalog;
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4: Schema（Database）作成
+# MAGIC ## Step 4: Schema 作成
 # MAGIC 
-# MAGIC Medallion Architectureに基づいてスキーマを作成します
+# MAGIC Bronze, Silver, Gold のスキーマを作成します。
+# MAGIC 各スキーマの `MANAGED LOCATION` は、それぞれのADLSコンテナを指定します。
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Bronze: 生データ層
+# MAGIC -- Bronze
 # MAGIC CREATE SCHEMA IF NOT EXISTS bronze
-# MAGIC MANAGED LOCATION 's3://lake-northwind-312871631496/bronze/'
-# MAGIC COMMENT 'Raw data from source systems';
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC -- Silver: クレンジング済みデータ層
+# MAGIC MANAGED LOCATION 'abfss://bronze@lakenorthwindharu.dfs.core.windows.net/managed_schema'
+# MAGIC COMMENT 'Raw data';
+# MAGIC 
+# MAGIC -- Silver
 # MAGIC CREATE SCHEMA IF NOT EXISTS silver
-# MAGIC MANAGED LOCATION 's3://lake-northwind-312871631496/silver/'
-# MAGIC COMMENT 'Cleansed and standardized data';
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC -- Gold: 集計・分析用データ層
+# MAGIC MANAGED LOCATION 'abfss://silver@lakenorthwindharu.dfs.core.windows.net/managed_schema'
+# MAGIC COMMENT 'Cleaned data';
+# MAGIC 
+# MAGIC -- Gold
 # MAGIC CREATE SCHEMA IF NOT EXISTS gold
-# MAGIC MANAGED LOCATION 's3://lake-northwind-312871631496/gold/'
-# MAGIC COMMENT 'Aggregated and business-ready data';
+# MAGIC MANAGED LOCATION 'abfss://gold@lakenorthwindharu.dfs.core.windows.net/managed_schema'
+# MAGIC COMMENT 'Aggregated data';
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Ops: 運用ログ・品質データ層
-# MAGIC CREATE SCHEMA IF NOT EXISTS ops
-# MAGIC MANAGED LOCATION 's3://lake-northwind-312871631496/ops/'
-# MAGIC COMMENT 'Operational logs and data quality results';
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC -- 作成したSchemaの確認
-# MAGIC SHOW SCHEMAS IN northwind;
+# MAGIC -- 確認
+# MAGIC SHOW SCHEMAS IN northwind_catalog;
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## ✅ セットアップ完了チェックリスト
+# MAGIC ## ✅ セットアップ完了
 # MAGIC 
-# MAGIC 以下が全て完了していることを確認してください：
-# MAGIC 
-# MAGIC - [ ] Storage Credential `aws_s3_credential` が作成された（IAM Role ARN使用）
-# MAGIC - [ ] External Location `northwind_datalake` が作成された
-# MAGIC - [ ] Catalog `northwind` が作成された
-# MAGIC - [ ] Schema `bronze`, `silver`, `gold`, `ops` が作成された
-# MAGIC 
-# MAGIC 次のステップ: `01_load_northwind_to_rds.py` でNorthwindデータをRDSに投入します
+# MAGIC 以下が作成されていることを確認してください：
+# MAGIC 1. Storage Credential: `azure_adls_credential`
+# MAGIC 2. External Locations: `ext_bronze`, `ext_silver`, `ext_gold`
+# MAGIC 3. Catalog: `northwind_catalog`
+# MAGIC 4. Schemas: `bronze`, `silver`, `gold`

@@ -14,7 +14,7 @@
 |------|--------|
 | サブスクリプション | ご自身のサブスクリプション |
 | リソースグループ | 新規作成: `rg-northwind-datalake` |
-| ストレージアカウント名 | `lakenorthwind<あなたのイニシャル>` (例: `lakenorthwindharu`) |
+| ストレージアカウント名 | `lakenorthwind<あなたのイニシャル>` (例: `lakenorthwindharu`) ※結果"lakenorthwindharu_1770645250229"|
 | リージョン | `Japan East` または `Japan West` |
 | パフォーマンス | `Standard` |
 | 冗長性 | `LRS` (ローカル冗長) |
@@ -68,20 +68,20 @@
 
 ## 4. ロール割り当て（IAM）
 
-Access ConnectorのManaged Identityにストレージへのアクセス権限を付与します。
+**重要**: この設定は「Access Connector」の画面ではなく、作成した**「ストレージアカウント」の画面**で行います。Access Connector（Managed Identity）に対して、ストレージへのアクセス権を許可するためです。
 
-1. **ストレージアカウント** を開く
+1. Azure Portal の検索バーで、作成した **ストレージアカウント**（`lakenorthwind...`）を検索して開く
 2. 左メニュー **「アクセス制御 (IAM)」** をクリック
-3. **「+ 追加」** → **「ロールの割り当ての追加」**
+3. **「+ 追加」** → **「ロールの割り当ての追加」** を選択
 4. 以下のように設定：
 
-| ステップ | 設定 |
-|---------|------|
-| **ロール** | `Storage Blob Data Contributor` を選択 |
-| **アクセスの割り当て先** | `マネージドID` |
-| **メンバー** | `+ メンバーを選択` → `Access Connector for Azure Databricks` → 上で作成したコネクタを選択 |
+| 項目 | 設定 | 備考 |
+|------|------|------|
+| **ロール** | `Storage Blob Data Contributor`<br>（ストレージ BLOB データ共同作成者） | 検索窓に入力して選択 |
+| **アクセスの割り当て先** | `マネージド ID` | ラジオボタンを選択 |
+| **メンバー** | `+ メンバーを選択`<br>→ サブスクリプション: (自分のもの)<br>→ マネージド ID: `Access Connector for Azure Databricks`<br>→ `adb-access-connector-northwind` を選択 | 最後に「選択」ボタンを押す |
 
-5. **「レビューと割り当て」** をクリック
+5. **「レビューと割り当て」** をクリックして完了
 
 ---
 
