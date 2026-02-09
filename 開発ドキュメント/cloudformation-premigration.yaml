@@ -69,7 +69,7 @@ Parameters:
 
   AzureDatabricksAccountId:
     Type: String
-    Default: 'e62e317c-8ea6-4fcd-a675-3dff14a5ce17'
+    Default: '7405617586190056'
     Description: Azure Databricks Account ID (16桁の数字。Databricks Account Console から取得)
 
   AzureDatabricksWorkspaceId:
