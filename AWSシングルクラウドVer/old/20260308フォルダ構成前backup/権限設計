@@ -1,0 +1,10 @@
+6. 権限設計（最小の方針）
+Unity Catalogが有効なら「スキーマ単位GRANT」が王道です。無効なら「S3/IAMとDatabricksのワークスペース権限」で代替します。
+
+役割（例）
+DataEngineer：bronze/silver/gold作成・更新
+Analyst：gold参照のみ
+Admin：全権限
+方針
+bronze：原則 Analyst に見せない（誤解・コスト増・個人情報混入対策の練習にもなる）
+gold：参照OK（必要ならマスキングView経由）

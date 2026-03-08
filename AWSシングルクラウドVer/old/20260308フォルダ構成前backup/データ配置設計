@@ -1,0 +1,15 @@
+5. データ配置設計（S3/スキーマ/命名）
+論理スキーマ（Databricks上）
+bronze：取り込み生（スナップショット/増分）
+silver：型・コード・重複・NULL等を整えた標準層
+gold：提供用（ファクト/ディメンション/集計）
+ops：運用ログ、品質結果、（必要なら）擬似リネージ
+共通メタ列（全bronzeに付与推奨）
+_run_id：ジョブ実行ID（UUID等）
+_load_date：取り込み基準日（例：2026-02-03）
+_ingest_ts：取り込みタイムスタンプ
+S3パス（例）
+s3://<bucket>/lake/northwind/bronze/<table_name>/
+s3://<bucket>/lake/northwind/silver/<table_name>/
+s3://<bucket>/lake/northwind/gold/<table_name>/
+s3://<bucket>/lake/northwind/ops/<table_name>/
