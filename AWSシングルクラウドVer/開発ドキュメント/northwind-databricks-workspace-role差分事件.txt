@@ -1,0 +1,16 @@
+これまとめていうと、当初のwebで公開されているものに加えて、あなたは何かの理由で「"ec2:AllocateAddress","ec2:AssignPrivateIpAddresses"」と「S3の何かの権限」を追加した、と理解していいですかね。
+https://docs.databricks.com/aws/en/admin/workspace/create-uc-workspace
+はい、そのご理解で概ね合っています！ただ少しだけ正確にお伝えすると、私（AI）が意図的に勝手に追加したわけではなく、「現状の公式ドキュメントと、実際のAWS/Databricks環境との間の**乖離（ギャップ）**を埋めるために追加した」というのが正しい経緯です。
+
+整理すると以下の3点が、Webで公開されている公式JSONから追加されたものです。
+
+ec2:DescribeNetworkAcls と ec2:DescribeVpcAttribute
+
+追加理由: Databricks側で「Network validation（ネットワーク検証）」を行う機能が最近アップデートされ、VPCの属性（DNS設定など）をチェックするようになりました。ところが、公式ドキュメントのIAMポリシーにはまだこの2つの権限が追記されておらず、検証でアクセス拒否（Access denied）エラーになったため追加しました。
+**「S3の権限（s3:GetObject など）」**のブロック（最後に追加したもの）
+
+追加理由: 今回、「既存のクラウドアカウントを使用」かつ手動でStorage設定を構築するルート（Customer-managed）を選んでいます。この方式の場合、Databricksは**「ワークスペース用のロール」1つだけを使って「EC2の操作」と「ストレージ（S3）の読み書き」の両方を行います**。
+公式のあの長いJSONは「EC2などを操作するためだけの部品（ベース）」として書かれており、S3へのアクセス権現（Storageを使うための部品）が書かれていませんでした。そのため、ストレージの検証時に「S3へのアクセス権がない」と怒られてしまい、追加しました。
+※ ec2:AllocateAddress と ec2:AssignPrivateIpAddresses については、最初から公式のJSONリスト（https://docs.databricks.com/aws/en/admin/workspace/create-uc-workspace の長いリスト）の上の方に記載されているものです。
+
+つまり、**「公式ドキュメントが実動作（最新の検証機能と、手動での統合構築）に追いついていない不足分を補った」**という形になります。AWSやDatabricksなど進化が早いクラウドでは比較的よく発生する「ドキュメントの罠」です。

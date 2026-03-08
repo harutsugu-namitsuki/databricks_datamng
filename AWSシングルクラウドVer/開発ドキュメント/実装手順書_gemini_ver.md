@@ -4,13 +4,45 @@
 
 ---
 
-## 全体の流れ（5つのステップ）
+## 全体の流れ（6つのステップ）
 
+0. **アカウント登録**: Databricksの無料アカウントを作成します（初回のみ）。
 1. **AWSの準備**: ネットワークやデータベース（RDS）、保存場所（S3）を自動で作ります。
 2. **Databricksの準備（外側）**: Databricksのワークスペース（作業場所）を作ります。
 3. **Databricksの準備（内側）**: パソコン（クラスター）の起動と、S3への接続設定をします。
 4. **パスワードの登録**: データベースのパスワードを安全に登録します。
 5. **プログラムの実行**: 実際にデータを流し込んで処理を行います。
+
+---
+
+## Phase 0: Databricks アカウントの準備（初回のみ）
+
+AWSの設定を始める前に、ご自身のDatabricksアカウントIDを取得します。
+ご自身の状況に合わせて、パターンAかパターンBのどちらかを実施してください。
+
+### パターンA: これから初めてアカウントを作る方
+**※途中でAWS画面を経由しますが、これは「連携」の作業です。インフラ自体はPhase 1のCloudFormationで作るので安心してください。**
+
+1. [Databricks 無料トライアルページ](https://databricks.com/jp/try-databricks) にアクセスします。
+2. 名前や会社名（個人の場合は個人名可）、メールアドレス等を入力して「次へ」を押します。
+3. **「クラウド・プロバイダーを選択してください」**という画面になるので、**Amazon Web Services (AWS)** にチェックを入れて「無料で開始」を押します。
+4. ※ここが紛らわしいポイントです※
+   画面が自動的に**AWS Manajemenet Console（AWS MarketplaceのDatabricksサブスクリプション画面）**に遷移します。
+   このステップは「AWS経由での支払い連携」をするためのものです。
+   - 画面の案内に従い、「View permissions」等を確認して連携（Subscribe）を進めます。
+   - 最終的に**「Create account（または Set up your account）」**というボタンが出てくるので、それをクリックします。
+5. （AWSから飛ばされて）**再びDatabricksの画面が開きます**。ここで最終的なパスワード設定等を行い、アカウントのセットアップが完了です。
+6. 設定が終わると、**Databricks Account Console** ([accounts.cloud.databricks.com](https://accounts.cloud.databricks.com/)) という「Databricks全体の管理画面」にようやくログインできるようになります。
+
+### パターンB: すでにアカウントをお持ちの方
+過去にDatabricksのアカウントを作成したことがある方は、以下の方法でAWS連携が済んでいるかを確認します。
+
+1. **Databricks Account Console** ([accounts.cloud.databricks.com](https://accounts.cloud.databricks.com/)) に直接アクセスし、ログインできるかを確認します。
+   - ログイン後、左メニューに **Workspaces** などの項目が表示されていれば、アカウント自体は正常に動作しています。
+2. そのまま右上のユーザー名（またはアイコン）をクリックして開くメニューから、まずは **Account ID** が取得できればOKです。このままPhase 1へ進んでください。
+3. **【AWSとの連携状態について】**
+   もし過去にAWSとの課金・連携設定（サブスクリプションの登録）を行っていないアカウントの場合、Phase 2でワークスペースを作成しようとしたり、クラウド・リソース（Cloud resources）を登録しようとしたタイミングでエラーが出たり、**AWS Marketplaceでの連携を促されるポップアップ**が表示されることがあります。
+   その場合は、画面の案内に従ってAWSコンソールへ飛び、連携作業（Subscribe）を完了させてから、再度ワークスペースの作成を再開してください。
 
 ---
 
@@ -57,13 +89,93 @@
 
 ## Phase 2: Databricks ワークスペースの作成
 
-### Step 2-1: ワークスペースの作成
-1. [Databricks Account Console](https://accounts.cloud.databricks.com/) に戻ります。
-2. 左メニューから **Workspaces** をクリックし、右上の **Create workspace** をクリックします。
-3. **AWS region** を `ap-northeast-1` (東京) にします。
-4. **VPC** の項目で、自身でVPCを持ち込むオプション（Customer-managed VPC）を選択し、Phase1で作った `northwind-vpc` とそのネットワークの設定（Private Subnetなど）を指定して作成を進めます。
-   ※画面の案内に従って作成を完了させてください。作成には数分かかります。
-5. 作成が終わったら **[Open workspace]** をクリックしてワークスペースに入ります。
+Databricksを利用するには、まず「Phase 0で作ったアカウント」にログインし、その後に「ワークスペース（実際の作業場所）」を作るという段階になります。
+
+### Step 2-1: AWS Marketplace サブスクリプションの有効化（必須）
+AWSリソース（VPCやS3など）をDatabricksから自動設定させるためには、DatabricksアカウントとAWSアカウントを「支払い・権限の面で連携」させる必要があります。
+※すでに過去にAWS連携を済ませているアカウントの場合は、このステップは不要（設定済み）ですので Step 2-2 へ進んでください。
+
+1. **Databricks Account Console** ([accounts.cloud.databricks.com](https://accounts.cloud.databricks.com/)) の左メニューの下部にある **Settings**（または雲のアイコン）から **AWS subscription** などの項目を開くか、クラウド・リソースの登録画面に進もうとすると、**「AWSとの連携（サブスクリプション）が必要です」という警告や案内**が出ます。
+2. 案内に従って **Link AWS Account** などのボタンをクリックすると、自動的に **AWSのManagement Console（AWS Marketplace画面）**が開きます。
+3. Marketplaceの画面で Databricks の内容を確認し、右上の **[Continue to Subscribe]**（または Subscribe）をクリックします。
+4. Terms and Conditions（利用規約）に同意し、セットアップを進めます。
+5. 処理が完了すると、自動的にDatabricksの画面に戻るか、「Set up your account」ボタンが出てDatabricksに遷移します。これで連携は完了です。
+
+※アカウントを管理→（左側）設定→サブスクリプションと請求→支払方法→AWSに画面遷移→サブスライブをクリック
+
+### Step 2-2: クラウド・リソース（AWSとの連携設定）の登録
+Phase 1で作ったAWSのネットワーク環境にワークスペースを構築するため、Account Consoleの左メニューにある **Cloud resources** (クラウド・リソース) から以下3つの設定を事前に行います。
+
+**① Credentials（資格情報）の登録**
+DatabricksがあなたのAWSアカウント上に「クラスター（計算用EC2）」を自動で作成・起動・停止するための権限（クロスアカウントIAMロール）を登録します。
+1. **Cloud resources** 画面の中の **Credentials**（または Identity）タブを開き、「Add credential」をクリックします。
+2. 任意の名前（例: `northwind-credential`）を入力します。
+3. 画面に表示される **外部ID (External ID)** （例: `cc35...` または `fc1...`）をコピーし、手元に控えます。
+4. **【AWS側での手動設定】** 別のタブで [AWS IAM 管理画面 (Roles)](https://us-east-1.console.aws.amazon.com/iam/home?region=ap-northeast-1#/roles) を開きます。
+5. IAM→ロール→ロールを作成※右上の **[ロールを作成]** をクリックします。
+6. 「信頼されたエンティティタイプ」で **[AWS アカウント]** を選択します。
+7. 「AWS アカウント」の項目で **[別のアカウント]** を選び、アカウントIDに **Databricks社の固定AWSアカウントID** である **`414351767826`** を入力します。
+8. オプションで **「外部 ID を要求する」** にチェックを入れます。
+   - ⚠️ **【超重要ポイント】** ここに入力する値は「414351767826」**ではありません**！（400エラーの原因になります）
+   - 手順3でコピーした**あなた専用の「外部ID」**（アカウントIDと同一、`cc35cba6...` や `fc1...` などハイフンを含む英数字）を必ず貼り付けてから、**[次へ]** を押します。
+9. 「許可ポリシーを追加」画面では何も選択せずに **[次へ]** を押します。
+10. 「ロール名」に `northwind-databricks-workspace-role` 等のわかりやすい名前を付け、**[ロールを作成]** を押します。
+11. 今作ったロール（`northwind-databricks-workspace-role`）を一覧から検索して開き、右側の **「ARN」** （`arn:aws:iam::...`）をコピーします。
+12. ロール画面下の **「許可」タブ** ＞ **「許可を追加」** ＞ **「インラインポリシーを作成」** をクリックします。
+13. 「JSON」タブに切り替え、本ドキュメントと同階層にある **`databricks_workspace_policy.json`** の中身を**すべてコピーして貼り付け**ます。
+    - ※このファイルには、DatabricksがAWS環境（VPC等）内にWorkspaceとなるクラスタ（EC2等）を自動構築・管理するために必要な権限がまとまっています。
+    - ※このファイルの出所はhttps://docs.databricks.com/aws/en/admin/workspace/create-uc-workspaceです。20260308時点では修正箇所あり。"ec2:DescribeNetworkAcls","ec2:DescribeVpcAttribute"。また、S3の権限も付与。詳細は別ドキュメント「northwind-databricks-workspace-role差分事件」参照。
+
+14. 「次へ」＞ ポリシー名（例: `databricks-workspace-policy`）を付けて保存します。
+15. **【Databricks画面へ戻る】** Databricksの登録画面に戻り、コピーした **ロールARN** を貼り付けて「Save（または Add）」をクリックして保存します。
+
+**② Storage（ストレージ設定）の登録**
+Databricksがワークスペースのライブラリやログなどを保存するためのS3バケットを登録します。
+1. **【Databricks画面】** **Cloud resources** 画面の中の **Storage** タブを開き、「Add storage configuration」をクリックします。
+2. **【Databricks画面】** 以下の項目を入力します：
+   - **ストレージ設定名**: 任意の名前（例: `northwind-storage`）
+   - **バケット名**: Phase 1のCloudFormation出力にある **`S3BucketName`** の値（例: `lake-northwind-78XXXXXXXXXX`）を入力します。
+   - **IAMロールARN**: 今度は IAMロールARN に northwind-databricks-workspace-role のARN を入力してください（空欄にしない）。
+3. **【Databricks画面】** **「ポリシーを生成」** ボタンをクリックすると、このS3バケットに設定すべき「バケットポリシーのJSONコード」が表示されます。
+   - ⚠️ **【超重要ポイント】** この「ポリシー生成」作業は、**必ずこのタイミング（ストレージ設定の追加画面が開いている間、追加を押すまで）**にやってください。これをやらないと、後でjsonコードが自動生成されなくなります。
+  - 💡 **もしポリシーのコピーを忘れたり、画面を閉じてしまった場合**：
+     - 本ドキュメントと同階層にある **`databricks_bucket_policy_template.json`** を開きます。
+     - コード内の `<s3-bucket-name>`（2箇所）を実際のバケット名に**`S3BucketName`** の値（例: `lake-northwind-78XXXXXXXXXX`）に書き換えれば、同じポリシーとして機能します。これをS3に貼り付けてください。
+4. **【AWS画面】** そのポリシーJSONをコピーした状態で、別タブで **AWS S3 管理画面** を開きます。
+   - 該当バケット（`lake-northwind-...`）を開き、**「アクセス許可」タブ** ＞ **「バケットポリシー」** の「編集」をクリックし、先ほどのJSONを貼り付けて保存（上書き）します。
+   - ※これでDenyだったものがallowになります。
+5. **【Databricks画面】** AWS側での保存が終わったらDatabricks画面に戻り、右下の「Save（または Add）」をクリックして保存します。
+
+**③ Network（ネットワーク）の登録**
+Phase 1で作成した自分のVPCをDatabricksが使えるようネットワーク設定を登録します。
+1. **【Databricks画面】** **Cloud resources** 画面の中の **Network** タブを開き、「Add network configuration」をクリックします。
+2. **【Databricks画面】** 以下の項目を入力します：
+   - **ネットワーク設定名**: 任意の名前（例: `northwind-network`）
+   - **VPC ID**: Phase 1のCloudFormation出力にある **`VPCId`** の値（例: `vpc-08XXXXXXXXXXXXX`）
+   - **サブネットID** (2つ必要): Phase 1のCloudFormation出力にある **`PrivateSubnetId`** の値と、もう一つのPrivate SubnetのIDを入力します。
+     - ※2つ目のサブネットIDはCloudFormation出力にないため、**【AWS画面】** VPC管理画面 ＞ 左メニュー「サブネット」から `northwind-private-subnet-2` を検索してIDをコピーしてきてください。
+     - ※ただのバックアップサーバー用のサブネット。CloudFormationで指定を省略した。
+   - **セキュリティグループID**: CloudFormation出力の **`DatabricksComputeSGId`** の値（例: `sg-XXXXXXXXXXXXX`）を指定します。
+     - ⚠️ `RDSSecurityGroupId`（RDS用）ではない方です。名前に「Compute」または「Databricks」が含まれている方を選んでください。
+   - **バックエンドプライベート接続 (VPCエンドポイント)**: 
+     - 「セキュアなクラスター接続を中継するためのVPCエンドポイント」
+     - 「REST API用のVPCエンドポイント」
+     - 今回の構成ではこの2つは使用しないため、**両方とも空欄のままでOK**です。
+3. **【Databricks画面】** 右下の「Add」をクリックして保存します。
+
+### Step 2-3: ワークスペースの作成
+準備が整ったので、ついにワークスペースを作ります。
+1. **【Databricks画面】** Account Consoleの左メニューから **Workspaces** をクリックし、右上の **Create workspace** をクリックします。
+2. **【Databricks画面】** 画面の入力方法として「Quickstart」ではなく、詳細設定ができる **Custom**（または Custom workspace）を選択します。（UIによっては最初からCustom入力画面になっています）
+3. **【Databricks画面】** 以下の通り入力します：
+   - **ワークスペース名**: 任意の名前（例: `northwind-workspace`）
+   - **リージョン**: `Tokyo (ap-northeast-1)`
+   - **ストレージとコンピュート**: ⚠️必ず **「既存のクラウドアカウントを使用」** を選択してください。（これが、これまで作ってきた自前のVPCやStorageを使うための設定です）
+   - **Credential**（資格情報）: Step 2-2①で作ったもの（`northwind-credential`）を選択
+   - **Storage configuration**（ストレージ設定）: Step 2-2②で作ったもの（`northwind-storage`）を選択
+   - **Network configuration**（ネットワーク設定）: Step 2-2③で作ったもの（`northwind-network`）を選択
+4. **【Databricks画面】** 右下の **Save**（または Create）をクリックします。
+5. **【Databricks画面】** 構築が始まります。ステータスが `Running`（緑色）になったら、作成されたワークスペース名のリンク、または **[Open workspace]** をクリックしてワークスペースに入ります。
 
 ---
 
