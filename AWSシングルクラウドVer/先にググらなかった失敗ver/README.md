@@ -7,8 +7,6 @@ Unity Catalog を活用したデータガバナンス基盤の構築プロジェ
 
 > **設計思想**: すべてのリソースをAWS上に集約し、クロスクラウド通信コスト・管理オーバーヘッドを排除する。
 
-> **参照**: [AWSを使用したDatabricksの環境構築 (Flect)](https://cloud.flect.co.jp/entry/2024/10/07/103341)
-
 ---
 
 ## データソース
@@ -26,23 +24,12 @@ Unity Catalog を活用したデータガバナンス基盤の構築プロジェ
 ## アーキテクチャ
 
 ```
-Databricks Control Plane (SaaS)
-    ↓ クラスタ管理 (ワークスペースロール)
-AWS Databricks (Unity Catalog — Customer-managed VPC)
-    ↓ IAM Role (カタログロール)
-AWS S3 (Bronze/Silver/Gold/Ops — Delta Lake)
-
 AWS RDS (Northwind — Private Subnet)
-    ↑ JDBC（VPC内通信）
-AWS Databricks Compute (EC2)
+    ↓ JDBC（VPC内通信）
+AWS Databricks (Unity Catalog)
+    ↓ IAM Role (Instance Profile)
+AWS S3 (Bronze/Silver/Gold/Ops — Delta Lake)
 ```
-
-### IAMロール構成（2ロール）
-
-| ロール | 信頼先 (Principal) | 用途 |
-|-------|-------------------|------|
-| **カタログロール** | `arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-...` | Unity Catalog → S3 メタデータ管理 |
-| **ワークスペースロール** | `arn:aws:iam::414351767826:root` + `ec2.amazonaws.com` | Databricks → EC2 クラスタ管理 |
 
 ---
 
@@ -77,7 +64,7 @@ AWSシングルクラウドVer/
 │       ├── 02_etl_bronze_ingest.py
 │       ├── 03_etl_silver_transform.py
 │       └── 04_etl_gold_aggregate.py
-└── 先にググらなかった失敗ver/（旧版）
+└── old/（旧版）
 ```
 
 ---
@@ -88,12 +75,11 @@ AWSシングルクラウドVer/
 
 実施順序：
 ```
-Phase 0: Databricks アカウント作成 + Account ID 取得
-  └→ Phase 1: CloudFormation デプロイ (IAMロール2種 + VPC + S3 + RDS)
-       └→ Phase 2: Cloud Resources登録 → ワークスペース作成 → Storage Credential + Secrets
-            └→ Phase 3: 00_setup_unity_catalog.py
-                 └→ Phase 4: 01_load_northwind_to_rds.py
-                      └→ Phase 5: 02 → 03 → 04 (日次)
+Phase 1: CloudFormation デプロイ
+  └→ Phase 2: Databricks設定 + Storage Credential + Secrets
+       └→ Phase 3: 00_setup_unity_catalog.py
+            └→ Phase 4: 01_load_northwind_to_rds.py
+                 └→ Phase 5: 02 → 03 → 04 (日次)
 ```
 
 ---
@@ -107,9 +93,7 @@ Phase 0: Databricks アカウント作成 + Account ID 取得
 | ソースDB | AWS RDS PostgreSQL |
 | データフォーマット | Delta Lake |
 | ガバナンス | Unity Catalog |
-| 認証 (カタログ) | IAM Role (UCMasterRole信頼) |
-| 認証 (ワークスペース) | IAM Role (クロスアカウント) |
-| ネットワーク | Customer-managed VPC + S3 VPCエンドポイント |
+| 認証 | IAM Role (Instance Profile) |
 | 監視 | CloudWatch + SNS |
 | 秘匿情報管理 | AWS Secrets Manager / Databricks Secret Scope |
 
@@ -122,7 +106,7 @@ Phase 0: Databricks アカウント作成 + Account ID 取得
 | Databricks | Azure Databricks | **AWS Databricks** |
 | データレイク | Azure ADLS Gen2 | **AWS S3** |
 | RDS接続 | インターネット経由 | **VPC内通信（Private Subnet）** |
-| 認証 | Managed Identity | **IAM Role x2（カタログ/ワークスペース）** |
+| 認証 | Managed Identity | **IAM Role** |
 | Northwindデータ | 手書き簡易サンプル | **pthom/northwind_psql フルデータ** |
 | テーブル数 | 7テーブル | **14テーブル** |
 | コスト | 高（クロスクラウド通信） | **低（AWS内完結）** |
@@ -157,4 +141,3 @@ Phase 0: Databricks アカウント作成 + Account ID 取得
 |------|----------|
 | 2026-03-08 | 初版作成（マルチクラウド→シングルクラウドに設計変更） |
 | 2026-03-08 | 開発ドキュメント追加、pthom/northwind_psql 採用（14テーブル） |
-| 2026-03-09 | Flectブログ参照版として再作成。IAMロール2種、SG要件準拠、VPCエンドポイント追加 |

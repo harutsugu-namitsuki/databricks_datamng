@@ -5,8 +5,6 @@
 Unity Catalog を使用してデータガバナンスを実現します。
 AWS Databricks 上で動作し、S3をストレージとして使用します。
 
-> 参照: [AWSを使用したDatabricksの環境構築 (Flect)](https://cloud.flect.co.jp/entry/2024/10/07/103341)
-
 ---
 
 ## 2. 名前空間構造
@@ -47,12 +45,10 @@ Unity Catalog
 |------|-----|
 | 名前 | `aws_s3_credential` |
 | タイプ | AWS IAM Role |
-| IAM Role ARN | CloudFormation Output: `CatalogRoleArn` |
-| 信頼ポリシー | UCMasterRole (`414351767826`) + self-assume |
+| IAM Role ARN | `arn:aws:iam::<account-id>:role/databricks-unity-catalog-role` |
+| 信頼ポリシー | Databricks の AWS Account ID を許可 |
 
-> ⚠️ **カタログロール**のARNを使用。ワークスペースロールではない。
-
-### IAM Role ポリシー（カタログロール）
+### IAM Role ポリシー（最小権限）
 
 ```json
 {
@@ -65,13 +61,11 @@ Unity Catalog
         "s3:PutObject",
         "s3:DeleteObject",
         "s3:ListBucket",
-        "s3:GetBucketLocation",
-        "s3:GetLifecycleConfiguration",
-        "s3:PutLifecycleConfiguration"
+        "s3:GetBucketLocation"
       ],
       "Resource": [
-        "arn:aws:s3:::lake-northwind-<account-id>",
-        "arn:aws:s3:::lake-northwind-<account-id>/*"
+        "arn:aws:s3:::lake-northwind",
+        "arn:aws:s3:::lake-northwind/*"
       ]
     }
   ]
@@ -84,17 +78,17 @@ Unity Catalog
 
 | 名前 | URL | Credential |
 |------|-----|------------|
-| `ext_bronze` | `s3://lake-northwind-<account-id>/bronze/` | aws_s3_credential |
-| `ext_silver` | `s3://lake-northwind-<account-id>/silver/` | aws_s3_credential |
-| `ext_gold` | `s3://lake-northwind-<account-id>/gold/` | aws_s3_credential |
-| `ext_ops` | `s3://lake-northwind-<account-id>/ops/` | aws_s3_credential |
+| `ext_bronze` | `s3://lake-northwind/bronze/` | aws_s3_credential |
+| `ext_silver` | `s3://lake-northwind/silver/` | aws_s3_credential |
+| `ext_gold` | `s3://lake-northwind/gold/` | aws_s3_credential |
+| `ext_ops` | `s3://lake-northwind/ops/` | aws_s3_credential |
 
 ### 作成SQL例
 
 ```sql
 -- External Location の作成
 CREATE EXTERNAL LOCATION ext_bronze
-  URL 's3://lake-northwind-<account-id>/bronze/'
+  URL 's3://lake-northwind/bronze/'
   WITH (STORAGE CREDENTIAL aws_s3_credential);
 ```
 
@@ -142,7 +136,6 @@ GRANT ALL PRIVILEGES ON SCHEMA northwind_catalog.ops TO engineer_group;
 |------|------|
 | クラスターモード | **専用（Single User）** を使用 |
 | Storage Credential作成 | **Databricks UIから作成**（SQLでは環境依存エラーあり） |
-| Storage CredentialのIAMロール | **カタログロール**を指定（ワークスペースロールではない） |
 | カタログ作成 | UIまたはSQLで作成（環境に応じて選択） |
 | External Location | **SQLで作成可能** |
 | スキーマ作成 | **SQLで作成可能** |
@@ -153,5 +146,4 @@ GRANT ALL PRIVILEGES ON SCHEMA northwind_catalog.ops TO engineer_group;
 
 | 日付 | 変更内容 |
 |------|----------|
-| 2026-03-08 | シングルクラウド版として作成 |
-| 2026-03-09 | カタログロール指定を明記、バケット名テンプレート修正 |
+| 2026-03-08 | シングルクラウド版として作成（Azure Managed Identity → AWS IAM Role、ADLS → S3） |
