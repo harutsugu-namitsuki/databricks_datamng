@@ -1,0 +1,13 @@
+{
+  "name": "c-level-skills",
+  "description": "Complete virtual board of directors: 10 C-level advisory roles, 6 orchestration skills, 6 cross-cutting capabilities, and 6 culture & collaboration frameworks. Features internal quality loop, two-layer memory, board meeting protocol with Phase 2 isolation, proactive triggers, and structured user communication standard.",
+  "version": "2.0.0",
+  "author": {
+    "name": "Alireza Rezvani",
+    "url": "https://alirezarezvani.com"
+  },
+  "homepage": "https://github.com/alirezarezvani/claude-skills/tree/main/c-level-advisor",
+  "repository": "https://github.com/alirezarezvani/claude-skills",
+  "license": "MIT",
+  "skills": "./"
+}

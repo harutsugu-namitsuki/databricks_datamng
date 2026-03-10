@@ -1,0 +1,39 @@
+# AgentKits Marketing - Code Owners
+# These owners will be requested for review when someone opens a PR
+# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything
+* @aitytech/core
+
+# Core plugin configuration
+/.claude-plugin/ @aitytech/core
+/CLAUDE.md @aitytech/core
+/plugin.json @aitytech/core
+/marketplace.json @aitytech/core
+
+# Agents
+/.claude/agents/ @aitytech/core
+
+# Commands
+/.claude/commands/ @aitytech/core
+
+# Skills
+/.claude/skills/ @aitytech/core
+
+# Workflows
+/.claude/workflows/ @aitytech/core
+
+# Training content
+/training/ @aitytech/core
+
+# Documentation
+/docs/ @aitytech/core
+/README.md @aitytech/core
+/CONTRIBUTING.md @aitytech/core
+
+# CI/CD and GitHub configuration
+/.github/ @aitytech/core
+
+# Package configuration
+/package.json @aitytech/core
+/.releaserc @aitytech/core

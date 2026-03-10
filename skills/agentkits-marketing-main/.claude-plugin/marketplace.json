@@ -1,0 +1,99 @@
+{
+  "name": "agentkits-marketing",
+  "owner": {
+    "name": "AityTech",
+    "email": "contact@agentkits.net"
+  },
+  "metadata": {
+    "description": "AI marketing agent tools by AityTech",
+    "version": "1.7.1"
+  },
+  "plugins": [
+    {
+      "name": "agentkits-marketing",
+      "source": "./",
+      "description": "Full marketing automation suite - 18 agents, 90+ commands, 28 skills, workflows, and training",
+      "version": "1.7.1",
+      "author": {
+        "name": "AityTech"
+      },
+      "homepage": "https://www.agentkits.net/marketing",
+      "repository": "https://github.com/aitytech/agentkits-marketing",
+      "license": "MIT",
+      "commands": "./.claude/commands",
+      "agents": [
+        "./.claude/agents/attraction-specialist.md",
+        "./.claude/agents/brainstormer.md",
+        "./.claude/agents/brand-voice-guardian.md",
+        "./.claude/agents/command-helper.md",
+        "./.claude/agents/continuity-specialist.md",
+        "./.claude/agents/conversion-optimizer.md",
+        "./.claude/agents/copywriter.md",
+        "./.claude/agents/docs-manager.md",
+        "./.claude/agents/email-wizard.md",
+        "./.claude/agents/lead-qualifier.md",
+        "./.claude/agents/mcp-manager.md",
+        "./.claude/agents/persona-builder.md",
+        "./.claude/agents/planner.md",
+        "./.claude/agents/project-manager.md",
+        "./.claude/agents/researcher.md",
+        "./.claude/agents/sales-enabler.md",
+        "./.claude/agents/seo-specialist.md",
+        "./.claude/agents/solopreneur.md",
+        "./.claude/agents/startup-founder.md",
+        "./.claude/agents/upsell-maximizer.md"
+      ],
+      "skills": "./.claude/skills",
+      "category": "marketing",
+      "tags": ["marketing", "content", "seo", "cro", "email", "sales", "campaigns", "automation"]
+    },
+    {
+      "name": "agentkits-marketing-skills",
+      "source": "./",
+      "description": "28 marketing skills including CRO, SEO, copywriting, psychology, and growth",
+      "version": "1.7.1",
+      "skills": "./.claude/skills",
+      "category": "skills",
+      "tags": ["skills", "marketing"]
+    },
+    {
+      "name": "agentkits-marketing-agents",
+      "source": "./",
+      "description": "18 specialized marketing agents for campaigns, content, and optimization",
+      "version": "1.7.1",
+      "agents": [
+        "./.claude/agents/attraction-specialist.md",
+        "./.claude/agents/brainstormer.md",
+        "./.claude/agents/brand-voice-guardian.md",
+        "./.claude/agents/command-helper.md",
+        "./.claude/agents/continuity-specialist.md",
+        "./.claude/agents/conversion-optimizer.md",
+        "./.claude/agents/copywriter.md",
+        "./.claude/agents/docs-manager.md",
+        "./.claude/agents/email-wizard.md",
+        "./.claude/agents/lead-qualifier.md",
+        "./.claude/agents/mcp-manager.md",
+        "./.claude/agents/persona-builder.md",
+        "./.claude/agents/planner.md",
+        "./.claude/agents/project-manager.md",
+        "./.claude/agents/researcher.md",
+        "./.claude/agents/sales-enabler.md",
+        "./.claude/agents/seo-specialist.md",
+        "./.claude/agents/solopreneur.md",
+        "./.claude/agents/startup-founder.md",
+        "./.claude/agents/upsell-maximizer.md"
+      ],
+      "category": "agents",
+      "tags": ["agents", "marketing"]
+    },
+    {
+      "name": "agentkits-marketing-commands",
+      "source": "./",
+      "description": "90+ marketing slash commands for campaigns, content, SEO, CRO, and analytics",
+      "version": "1.7.1",
+      "commands": "./.claude/commands",
+      "category": "commands",
+      "tags": ["commands", "marketing"]
+    }
+  ]
+}

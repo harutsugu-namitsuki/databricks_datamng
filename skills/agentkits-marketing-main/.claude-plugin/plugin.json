@@ -1,0 +1,29 @@
+{
+  "name": "agentkits-marketing",
+  "version": "1.7.1",
+  "description": "Enterprise-grade AI marketing automation framework - 18 agents, 90+ commands, 28 skills for campaigns, content, SEO, and conversion optimization",
+  "author": {
+    "name": "AityTech",
+    "url": "https://www.agentkits.net"
+  },
+  "homepage": "https://www.agentkits.net/marketing",
+  "repository": "https://github.com/aitytech/agentkits-marketing",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "marketing",
+    "ai-agents",
+    "content-marketing",
+    "seo",
+    "conversion-optimization",
+    "cro",
+    "email-marketing",
+    "social-media",
+    "copywriting",
+    "campaign-management",
+    "lead-generation",
+    "sales-enablement",
+    "brand-building",
+    "analytics"
+  ]
+}
