@@ -1,0 +1,18 @@
+﻿キー,値,説明,エクスポート名
+DatabricksComputeSGId,sg-0d5ea54e2c60ef606,Databricks Compute Security Group ID,-
+DatabricksUnityRoleArn,arn:aws:iam::784318224989:role/northwind-databricks-unity-role,IAM Role ARN for Databricks Unity Catalog,-
+DBCredentialsSecretArn,arn:aws:secretsmanager:ap-northeast-1:784318224989:secret:northwind/rds/credentials-Eudoew,ARN of the DB credentials secret,-
+PrivateSubnetId,subnet-06ae9ca9a939d7f4b,Private Subnet ID,-
+RDSConnectionString,jdbc:postgresql://northwind-db.clwm6iaoo0g6.ap-northeast-1.rds.amazonaws.com:5432/northwind?sslmode=require,JDBC Connection String for RDS,-
+RDSEndpoint,northwind-db.clwm6iaoo0g6.ap-northeast-1.rds.amazonaws.com,RDS PostgreSQL Endpoint (Private),-
+RDSSecurityGroupId,sg-041074f295e8d2b98,RDS Security Group ID,-
+S3BucketArn,arn:aws:s3:::lake-northwind-784318224989,S3 Data Lake Bucket ARN,-
+S3BucketName,lake-northwind-784318224989,S3 Data Lake Bucket Name,-
+VPCId,vpc-085a84e2bafb2cc73,VPC ID,-
+一覧にない分,,,
+northwind-databricks-workspace-role,arn:aws:iam::784318224989:role/northwind-databricks-workspace-role,IAM Role ARN for Databricks ワークプレイス,
+northwind-private-subnet-2,subnet-0c8b0f1018c44de85,Private Subnet ID-2,
+,,,
+,,,
+databricksの外部ID,,,
+cc35cba6-2faa-4d89-9113-e9c68f076d05,,,
