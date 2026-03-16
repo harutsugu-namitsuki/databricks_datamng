@@ -6,8 +6,8 @@ Description: |
   - S3 Bucket + バケットポリシー (Delta Lake)
   - Customer-managed VPC + セキュリティグループ (Databricks要件準拠)
   - S3 VPCエンドポイント
-  - RDS PostgreSQL (Private Subnet)
-  - NAT Gateway + Internet Gateway
+  - RDS PostgreSQL
+  - Internet Gateway (No NAT)
   - AWS Secrets Manager
 
   参照: https://cloud.flect.co.jp/entry/2024/10/07/103341
@@ -129,7 +129,7 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: !Ref PrivateSubnet1Cidr
-      MapPublicIpOnLaunch: false
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-private-subnet-1
@@ -141,26 +141,10 @@ Resources:
       VpcId: !Ref VPC
       AvailabilityZone: !Select [1, !GetAZs '']
       CidrBlock: !Ref PrivateSubnet2Cidr
-      MapPublicIpOnLaunch: false
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-private-subnet-2
-
-  # --- NAT Gateway ---
-  NATGatewayEIP:
-    Type: AWS::EC2::EIP
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      Domain: vpc
-
-  NATGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NATGatewayEIP.AllocationId
-      SubnetId: !Ref PublicSubnet
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-nat-gw
 
   # --- Route Tables ---
   PublicRouteTable:
@@ -195,10 +179,11 @@ Resources:
 
   DefaultPrivateRoute:
     Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NATGateway
+      GatewayId: !Ref InternetGateway
 
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -230,7 +215,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: !Sub ${EnvironmentName}-dbx-compute-sg
-      GroupDescription: Databricks Compute用セキュリティグループ (Databricks要件準拠)
+      GroupDescription: Security Group for Databricks Compute (Databricks required)
       VpcId: !Ref VPC
       # Egress: Databricks要件の個別ポート
       SecurityGroupEgress:
@@ -238,27 +223,27 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
-          Description: Databricksインフラ、クラウドデータソース、ライブラリリポジトリ
+          Description: Databricks infrastructure, cloud data sources, libraries
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
           CidrIp: 0.0.0.0/0
-          Description: メタストア
+          Description: Metastore
         - IpProtocol: tcp
           FromPort: 8443
           ToPort: 8443
           CidrIp: 0.0.0.0/0
-          Description: Databricksコントロールプレーン API (内部呼び出し)
+          Description: Databricks Control Plane API (Internal call)
         - IpProtocol: tcp
           FromPort: 8444
           ToPort: 8444
           CidrIp: 0.0.0.0/0
-          Description: Unity Catalogログ記録・系列データストリーミング
+          Description: Unity Catalog logging and streaming
         - IpProtocol: tcp
           FromPort: 8445
           ToPort: 8451
           CidrIp: 0.0.0.0/0
-          Description: 将来的な拡張性用
+          Description: Future expansion
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-dbx-compute-sg
@@ -268,7 +253,7 @@ Resources:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       GroupId: !Ref DatabricksComputeSG
-      Description: SG内の全TCP通信を許可
+      Description: Allow all TCP traffic within SG
       SourceSecurityGroupId: !Ref DatabricksComputeSG
       IpProtocol: tcp
       FromPort: 0
@@ -279,7 +264,7 @@ Resources:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       GroupId: !Ref DatabricksComputeSG
-      Description: SG内の全UDP通信を許可
+      Description: Allow all UDP traffic within SG
       SourceSecurityGroupId: !Ref DatabricksComputeSG
       IpProtocol: udp
       FromPort: 0
@@ -290,7 +275,7 @@ Resources:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
       GroupId: !Ref DatabricksComputeSG
-      Description: SG内の全TCP通信を許可 (内部トラフィック)
+      Description: Allow all TCP traffic within SG (Internal)
       DestinationSecurityGroupId: !Ref DatabricksComputeSG
       IpProtocol: tcp
       FromPort: 0
@@ -300,7 +285,7 @@ Resources:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
       GroupId: !Ref DatabricksComputeSG
-      Description: SG内の全UDP通信を許可 (内部トラフィック)
+      Description: Allow all UDP traffic within SG (Internal)
       DestinationSecurityGroupId: !Ref DatabricksComputeSG
       IpProtocol: udp
       FromPort: 0
@@ -311,7 +296,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: !Sub ${EnvironmentName}-rds-sg
-      GroupDescription: RDS用 - Databricks ComputeからのPostgreSQLアクセスのみ許可
+      GroupDescription: Security Group for RDS (Allows Databricks Compute access only)
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -438,7 +423,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub ${EnvironmentName}-databricks-catalog-role
-      Description: Unity Catalog用 カタログIAMロール (S3メタデータ管理)
+      Description: IAM Role for Unity Catalog S3 access
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -506,7 +491,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub ${EnvironmentName}-databricks-workspace-role
-      Description: Databricks ワークスペースIAMロール (EC2クラスタ管理)
+      Description: IAM Role for Databricks workspace EC2 management
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:

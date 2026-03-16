@@ -1,0 +1,27 @@
+name: Validate Manifest
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+      - 'scripts/generate_manifest.py'
+      - 'manifest.json'
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate manifest is up to date
+        run: python3 scripts/generate_manifest.py validate
