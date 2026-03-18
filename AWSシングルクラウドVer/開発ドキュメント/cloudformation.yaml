@@ -179,11 +179,10 @@ Resources:
 
   DefaultPrivateRoute:
     Type: AWS::EC2::Route
-    DependsOn: InternetGatewayAttachment
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+      NatGatewayId: !Ref NatGateway
 
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
