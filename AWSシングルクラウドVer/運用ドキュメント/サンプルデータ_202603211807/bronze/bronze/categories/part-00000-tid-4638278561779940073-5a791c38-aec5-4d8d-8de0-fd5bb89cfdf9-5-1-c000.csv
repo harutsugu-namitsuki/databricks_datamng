@@ -1,0 +1,9 @@
+category_id,category_name,description,picture,_run_id,_load_date,_ingest_ts,_source_system
+1,Beverages,"Soft drinks, coffees, teas, beers, and ales",[],06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:13:46.915Z,rds_northwind
+2,Condiments,"Sweet and savory sauces, relishes, spreads, and seasonings",[],06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:13:46.915Z,rds_northwind
+3,Confections,"Desserts, candies, and sweet breads",[],06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:13:46.915Z,rds_northwind
+4,Dairy Products,Cheeses,[],06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:13:46.915Z,rds_northwind
+5,Grains/Cereals,"Breads, crackers, pasta, and cereal",[],06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:13:46.915Z,rds_northwind
+6,Meat/Poultry,Prepared meats,[],06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:13:46.915Z,rds_northwind
+7,Produce,Dried fruit and bean curd,[],06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:13:46.915Z,rds_northwind
+8,Seafood,Seaweed and fish,[],06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:13:46.915Z,rds_northwind

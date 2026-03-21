@@ -1,0 +1,11 @@
+customer_id,company_name,contact_name,contact_title,address,city,region,postal_code,country,phone,fax
+ALFKI,Alfreds Futterkiste,Maria Anders,Sales Representative,Obere Str. 57,Berlin,N/A,12209,GERMANY,030-0074321,030-0076545
+ANATR,Ana Trujillo Emparedados y helados,Ana Trujillo,Owner,Avda. de la Constitución 2222,México D.F.,N/A,05021,MEXICO,(5) 555-4729,(5) 555-3745
+ANTON,Antonio Moreno Taquería,Antonio Moreno,Owner,Mataderos  2312,México D.F.,N/A,05023,MEXICO,(5) 555-3932,
+AROUT,Around the Horn,Thomas Hardy,Sales Representative,120 Hanover Sq.,London,N/A,WA1 1DP,UK,(171) 555-7788,(171) 555-6750
+BERGS,Berglunds snabbköp,Christina Berglund,Order Administrator,Berguvsvägen  8,Luleå,N/A,S-958 22,SWEDEN,0921-12 34 65,0921-12 34 67
+BLAUS,Blauer See Delikatessen,Hanna Moos,Sales Representative,Forsterstr. 57,Mannheim,N/A,68306,GERMANY,0621-08460,0621-08924
+BLONP,Blondesddsl père et fils,Frédérique Citeaux,Marketing Manager,"24, place Kléber",Strasbourg,N/A,67000,FRANCE,88.60.15.31,88.60.15.32
+BOLID,Bólido Comidas preparadas,Martín Sommer,Owner,"C/ Araquil, 67",Madrid,N/A,28023,SPAIN,(91) 555 22 82,(91) 555 91 99
+BONAP,Bon app',Laurence Lebihan,Owner,"12, rue des Bouchers",Marseille,N/A,13008,FRANCE,91.24.45.40,91.24.45.41
+BOTTM,Bottom-Dollar Markets,Elizabeth Lincoln,Accounting Manager,23 Tsawassen Blvd.,Tsawassen,BC,T2F 8M4,CANADA,(604) 555-4729,(604) 555-3745

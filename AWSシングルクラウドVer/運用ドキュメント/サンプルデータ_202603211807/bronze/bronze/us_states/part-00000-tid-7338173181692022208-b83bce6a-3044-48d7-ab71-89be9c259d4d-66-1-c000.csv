@@ -1,0 +1,11 @@
+state_id,state_name,state_abbr,state_region,_run_id,_load_date,_ingest_ts,_source_system
+1,Alabama,AL,south,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+2,Alaska,AK,north,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+3,Arizona,AZ,west,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+4,Arkansas,AR,south,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+5,California,CA,west,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+6,Colorado,CO,west,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+7,Connecticut,CT,east,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+8,Delaware,DE,east,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+9,District of Columbia,DC,east,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind
+10,Florida,FL,south,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:39.239Z,rds_northwind

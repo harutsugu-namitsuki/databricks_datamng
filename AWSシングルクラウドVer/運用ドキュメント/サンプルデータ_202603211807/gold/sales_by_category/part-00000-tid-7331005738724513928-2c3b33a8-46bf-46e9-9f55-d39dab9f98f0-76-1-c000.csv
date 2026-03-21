@@ -1,0 +1,11 @@
+category_id,category_name,order_year,order_month,total_sales,total_quantity,order_count
+1,Beverages,1996,7,3182.50,272,11
+1,Beverages,1996,8,4866.88,347,16
+1,Beverages,1996,9,5088.40,285,12
+1,Beverages,1996,10,8187.36,301,12
+1,Beverages,1996,11,17162.06,332,15
+1,Beverages,1996,12,9431.80,305,12
+1,Beverages,1997,1,21904.16,330,10
+1,Beverages,1997,2,2845.84,220,12
+1,Beverages,1997,3,10636.88,471,16
+1,Beverages,1997,4,7074.35,268,15

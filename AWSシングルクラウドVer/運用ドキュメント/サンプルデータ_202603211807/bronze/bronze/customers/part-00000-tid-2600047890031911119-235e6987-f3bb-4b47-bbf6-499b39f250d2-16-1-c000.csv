@@ -1,0 +1,11 @@
+customer_id,company_name,contact_name,contact_title,address,city,region,postal_code,country,phone,fax,_run_id,_load_date,_ingest_ts,_source_system
+ALFKI,Alfreds Futterkiste,Maria Anders,Sales Representative,Obere Str. 57,Berlin,,12209,Germany,030-0074321,030-0076545,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+ANATR,Ana Trujillo Emparedados y helados,Ana Trujillo,Owner,Avda. de la Constitución 2222,México D.F.,,05021,Mexico,(5) 555-4729,(5) 555-3745,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+ANTON,Antonio Moreno Taquería,Antonio Moreno,Owner,Mataderos  2312,México D.F.,,05023,Mexico,(5) 555-3932,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+AROUT,Around the Horn,Thomas Hardy,Sales Representative,120 Hanover Sq.,London,,WA1 1DP,UK,(171) 555-7788,(171) 555-6750,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+BERGS,Berglunds snabbköp,Christina Berglund,Order Administrator,Berguvsvägen  8,Luleå,,S-958 22,Sweden,0921-12 34 65,0921-12 34 67,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+BLAUS,Blauer See Delikatessen,Hanna Moos,Sales Representative,Forsterstr. 57,Mannheim,,68306,Germany,0621-08460,0621-08924,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+BLONP,Blondesddsl père et fils,Frédérique Citeaux,Marketing Manager,"24, place Kléber",Strasbourg,,67000,France,88.60.15.31,88.60.15.32,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+BOLID,Bólido Comidas preparadas,Martín Sommer,Owner,"C/ Araquil, 67",Madrid,,28023,Spain,(91) 555 22 82,(91) 555 91 99,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+BONAP,Bon app',Laurence Lebihan,Owner,"12, rue des Bouchers",Marseille,,13008,France,91.24.45.40,91.24.45.41,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind
+BOTTM,Bottom-Dollar Markets,Elizabeth Lincoln,Accounting Manager,23 Tsawassen Blvd.,Tsawassen,BC,T2F 8M4,Canada,(604) 555-4729,(604) 555-3745,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:00.644Z,rds_northwind

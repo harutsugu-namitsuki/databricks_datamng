@@ -1,0 +1,5 @@
+region_id,region_description,_run_id,_load_date,_ingest_ts,_source_system
+1,Eastern,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:31.848Z,rds_northwind
+2,Western,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:31.848Z,rds_northwind
+3,Northern,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:31.848Z,rds_northwind
+4,Southern,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:31.848Z,rds_northwind

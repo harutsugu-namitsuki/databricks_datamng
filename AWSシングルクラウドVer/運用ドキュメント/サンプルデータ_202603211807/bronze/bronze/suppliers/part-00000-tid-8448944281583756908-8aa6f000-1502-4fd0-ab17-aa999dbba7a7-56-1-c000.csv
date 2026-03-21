@@ -1,0 +1,11 @@
+supplier_id,company_name,contact_name,contact_title,address,city,region,postal_code,country,phone,fax,homepage,_run_id,_load_date,_ingest_ts,_source_system
+1,Exotic Liquids,Charlotte Cooper,Purchasing Manager,49 Gilbert St.,London,,EC1 4SD,UK,(171) 555-2222,,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+2,New Orleans Cajun Delights,Shelley Burke,Order Administrator,P.O. Box 78934,New Orleans,LA,70117,USA,(100) 555-4822,,#CAJUN.HTM#,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+3,Grandma Kelly's Homestead,Regina Murphy,Sales Representative,707 Oxford Rd.,Ann Arbor,MI,48104,USA,(313) 555-5735,(313) 555-3349,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+4,Tokyo Traders,Yoshi Nagase,Marketing Manager,9-8 Sekimai Musashino-shi,Tokyo,,100,Japan,(03) 3555-5011,,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+5,Cooperativa de Quesos 'Las Cabras',Antonio del Valle Saavedra,Export Administrator,Calle del Rosal 4,Oviedo,Asturias,33007,Spain,(98) 598 76 54,,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+6,Mayumi's,Mayumi Ohno,Marketing Representative,92 Setsuko Chuo-ku,Osaka,,545,Japan,(06) 431-7877,,Mayumi's (on the World Wide Web)#http://www.microsoft.com/accessdev/sampleapps/mayumi.htm#,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+7,"Pavlova, Ltd.",Ian Devling,Marketing Manager,74 Rose St. Moonie Ponds,Melbourne,Victoria,3058,Australia,(03) 444-2343,(03) 444-6588,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+8,"Specialty Biscuits, Ltd.",Peter Wilson,Sales Representative,29 King's Way,Manchester,,M14 GSD,UK,(161) 555-4448,,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+9,PB Knäckebröd AB,Lars Peterson,Sales Agent,Kaloadagatan 13,Göteborg,,S-345 67,Sweden,031-987 65 43,031-987 65 91,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind
+10,Refrescos Americanas LTDA,Carlos Diaz,Marketing Manager,Av. das Americanas 12.890,Sao Paulo,,5442,Brazil,(11) 555 4640,,,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:11.305Z,rds_northwind

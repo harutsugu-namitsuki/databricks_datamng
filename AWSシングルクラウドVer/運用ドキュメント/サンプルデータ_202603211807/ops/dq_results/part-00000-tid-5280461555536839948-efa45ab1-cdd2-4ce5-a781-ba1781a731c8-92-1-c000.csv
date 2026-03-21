@@ -1,0 +1,4 @@
+run_id,rule_name,table_name,fail_count,threshold,result
+945ab1a0-8df5-4caa-874e-8a3b0f303572,dup_check_order_id,silver.orders,0,0,PASS
+945ab1a0-8df5-4caa-874e-8a3b0f303572,positive_unit_price,silver.order_details,0,0,PASS
+945ab1a0-8df5-4caa-874e-8a3b0f303572,null_check_company_name,silver.customers,0,0,PASS

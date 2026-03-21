@@ -1,0 +1,11 @@
+customer_id,company_name,country,order_year,order_month,total_sales,order_count,avg_order_value
+ALFKI,Alfreds Futterkiste,GERMANY,1997,8,814.50,3,271.500000
+ALFKI,Alfreds Futterkiste,GERMANY,1997,10,1208.00,3,402.666667
+ALFKI,Alfreds Futterkiste,GERMANY,1998,1,845.80,2,422.900000
+ALFKI,Alfreds Futterkiste,GERMANY,1998,3,471.20,2,235.600000
+ALFKI,Alfreds Futterkiste,GERMANY,1998,4,933.50,2,466.750000
+ANATR,Ana Trujillo Emparedados y helados,MEXICO,1996,9,88.80,2,44.400000
+ANATR,Ana Trujillo Emparedados y helados,MEXICO,1997,8,479.75,3,159.916667
+ANATR,Ana Trujillo Emparedados y helados,MEXICO,1997,11,320.00,1,320.000000
+ANATR,Ana Trujillo Emparedados y helados,MEXICO,1998,3,514.40,4,128.600000
+ANTON,Antonio Moreno Taquería,MEXICO,1996,11,403.20,1,403.200000

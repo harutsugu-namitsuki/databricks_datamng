@@ -1,0 +1,7 @@
+shipper_id,company_name,phone,_run_id,_load_date,_ingest_ts,_source_system
+1,Speedy Express,(503) 555-9831,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:15.314Z,rds_northwind
+2,United Package,(503) 555-3199,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:15.314Z,rds_northwind
+3,Federal Shipping,(503) 555-9931,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:15.314Z,rds_northwind
+4,Alliance Shippers,1-800-222-0451,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:15.314Z,rds_northwind
+5,UPS,1-800-782-7892,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:15.314Z,rds_northwind
+6,DHL,1-800-225-5345,06c45e30-b206-4f2b-97f3-b26559b1d14a,2026-03-21,2026-03-21T08:14:15.314Z,rds_northwind

@@ -1,0 +1,11 @@
+order_id,customer_id,employee_id,order_date,required_date,shipped_date,ship_via,freight,ship_name,ship_address,ship_city,ship_region,ship_postal_code,ship_country
+10248,VINET,5,1996-07-04,1996-08-01,1996-07-16,3,32.380001068115234,Vins et alcools Chevalier,59 rue de l'Abbaye,Reims,,51100,FRANCE
+10249,TOMSP,6,1996-07-05,1996-08-16,1996-07-10,1,11.609999656677246,Toms Spezialitäten,Luisenstr. 48,Münster,,44087,GERMANY
+10250,HANAR,4,1996-07-08,1996-08-05,1996-07-12,2,65.83000183105469,Hanari Carnes,"Rua do Paço, 67",Rio de Janeiro,RJ,05454-876,BRAZIL
+10251,VICTE,3,1996-07-08,1996-08-05,1996-07-15,1,41.34000015258789,Victuailles en stock,"2, rue du Commerce",Lyon,,69004,FRANCE
+10252,SUPRD,4,1996-07-09,1996-08-06,1996-07-11,2,51.29999923706055,Suprêmes délices,"Boulevard Tirou, 255",Charleroi,,B-6000,BELGIUM
+10253,HANAR,3,1996-07-10,1996-07-24,1996-07-16,2,58.16999816894531,Hanari Carnes,"Rua do Paço, 67",Rio de Janeiro,RJ,05454-876,BRAZIL
+10254,CHOPS,5,1996-07-11,1996-08-08,1996-07-23,2,22.979999542236328,Chop-suey Chinese,Hauptstr. 31,Bern,,3012,SWITZERLAND
+10255,RICSU,9,1996-07-12,1996-08-09,1996-07-15,3,148.3300018310547,Richter Supermarkt,Starenweg 5,Genève,,1204,SWITZERLAND
+10256,WELLI,3,1996-07-15,1996-08-12,1996-07-17,2,13.970000267028809,Wellington Importadora,"Rua do Mercado, 12",Resende,SP,08737-363,BRAZIL
+10257,HILAA,4,1996-07-16,1996-08-13,1996-07-22,3,81.91000366210938,HILARION-Abastos,Carrera 22 con Ave. Carlos Soublette #8-35,San Cristóbal,Táchira,5022,VENEZUELA

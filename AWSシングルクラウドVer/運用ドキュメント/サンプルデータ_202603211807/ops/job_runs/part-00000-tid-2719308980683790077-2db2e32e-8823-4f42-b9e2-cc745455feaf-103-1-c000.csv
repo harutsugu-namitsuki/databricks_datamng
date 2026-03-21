@@ -1,0 +1,2 @@
+run_id,job_name,start_time,end_time,status,executed_by,notebook_path
+db5f87ec-a64a-4c60-a0a6-ccf86fd00c44,04_etl_gold_aggregate,2026-03-21T08:32:49.351Z,2026-03-21T08:32:49.351Z,SUCCESS,databricks,/notebooks/04_etl_gold_aggregate
