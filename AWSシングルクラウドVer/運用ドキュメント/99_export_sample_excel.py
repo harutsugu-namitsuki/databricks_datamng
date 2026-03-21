@@ -13,13 +13,12 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install openpyxl
-
-# COMMAND ----------
-
 # ==========================================
 # 1. 初期設定
 # ==========================================
+import subprocess
+subprocess.run(["pip", "install", "openpyxl"], check=True)
+
 from datetime import datetime
 
 TARGET_CATALOG = "northwind_catalog"
