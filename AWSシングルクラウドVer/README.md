@@ -51,40 +51,71 @@ AWS Databricks Compute (EC2)
 ```
 AWSシングルクラウドVer/
 ├── README.md（本ファイル）
-├── 設計ドキュメント/
-│   ├── 要件定義書.md
-│   ├── アーキ図（論理アーキテクチャ）.md
-│   ├── システム構成図.md
-│   ├── システム構成図の要素一覧.md
-│   ├── データフロー図.md
-│   ├── システムフロー図.md
-│   ├── テーブル設計書.md
-│   ├── UnityCatalog設計書.md
-│   ├── データ配置設計.md
-│   ├── 権限設計.md
-│   ├── 運用設計.md
-│   ├── コスト比較.md
-│   └── northwind.sql（データソース）
-├── 開発ドキュメント/
-│   ├── 実装手順書.md            ← 実施順序ガイド
-│   ├── 環境構築手順書.md
-│   ├── cloudformation.yaml
-│   ├── Notebook仕様書.md
-│   ├── テスト計画書.md
-│   └── notebooks/
-│       ├── 00_setup_unity_catalog.py
-│       ├── 01_load_northwind_to_rds.py
-│       ├── 02_etl_bronze_ingest.py
-│       ├── 03_etl_silver_transform.py
-│       └── 04_etl_gold_aggregate.py
-└── 先にググらなかった失敗ver/（旧版）
+├── docs/
+│   ├── 01_management/                          ← プロジェクト管理
+│   │   ├── 00_sprint_backlog.md
+│   │   ├── 00_sprint_backlog_import.csv
+│   │   └── 検討フォルダ/                        ← 振り返り・検討メモ
+│   │
+│   ├── 02_design/                              ← 設計ドキュメント
+│   │   ├── 01_基本設計・要件定義/
+│   │   │   ├── 要件定義書.md
+│   │   │   ├── アーキ図（論理アーキテクチャ）.md
+│   │   │   ├── システム構成図.md
+│   │   │   ├── システム構成図の要素一覧.md
+│   │   │   ├── データフロー図.md
+│   │   │   ├── システムフロー図.md
+│   │   │   └── コスト比較.md
+│   │   ├── 02_インフラ・ガバナンス設計/
+│   │   │   ├── UnityCatalog設計書.md
+│   │   │   ├── 権限設計.md
+│   │   │   ├── 運用設計.md
+│   │   │   └── CI_CD_IaC設計書.md
+│   │   ├── 03_データエンジニアリング設計/
+│   │   │   ├── テーブル設計書.md
+│   │   │   ├── データ配置設計.md
+│   │   │   ├── メダリオンアーキテクチャ設計書.md
+│   │   │   └── northwind.sql（データソース）
+│   │   ├── 04_データサイエンス・BI設計/
+│   │   │   ├── ダッシュボード設計書.md
+│   │   │   ├── データディスカバリ設計.md
+│   │   │   └── 機械学習モデル運用要件.md
+│   │   └── 05_アプリ統合設計/
+│   │       └── E2Eアプリ連携設計書.md
+│   │
+│   ├── 03_development/                         ← 開発ドキュメント
+│   │   ├── 00_初期環境構築手順_インフラ/
+│   │   │   ├── 実装手順書.md                    ← 実施順序ガイド
+│   │   │   ├── 環境構築手順書.md
+│   │   │   ├── CloudFormation更新手順_UI編.md
+│   │   │   ├── cloudformation.yaml
+│   │   │   ├── Notebook仕様書.md
+│   │   │   └── notebooks/
+│   │   │       ├── 00_setup_unity_catalog.py
+│   │   │       ├── 01_load_northwind_to_rds.py
+│   │   │       ├── 02_etl_bronze_ingest.py
+│   │   │       ├── 03_etl_silver_transform.py
+│   │   │       └── 04_etl_gold_aggregate.py
+│   │   ├── 01_機能実装マニュアル/
+│   │   │   ├── XX_パイプライン開発手順.md
+│   │   │   ├── XX_BIダッシュボード作成手順.md
+│   │   │   └── XX_CI_CDデプロイ自動化手順.md
+│   │   └── 02_テスト・検証/
+│   │       └── テスト計画書.md
+│   │
+│   └── 04_operation/                           ← 運用（サンプルデータ出力等）
+│       ├── 99_export_sample_excel.py
+│       └── サンプルデータ統合_202603211807.xlsx
+│
+├── 運用ドキュメント/                             ← 運用ドキュメント（準備中）
+└── old/                                        ← 旧版・バックアップ
 ```
 
 ---
 
 ## クイックスタート
 
-**→ `開発ドキュメント/実装手順書.md` を参照してください。**
+**→ `docs/03_development/00_初期環境構築手順_インフラ/実装手順書.md` を参照してください。**
 
 実施順序：
 ```
@@ -142,12 +173,13 @@ Phase 0: Databricks アカウント作成 + Account ID 取得
 - 上記のうち、Bronze/Silver/Gold 各層への反映も必要
 
 > この対応時には、以下のドキュメントも合わせて更新すること:
-> - `設計ドキュメント/要件定義書.md` — テーブル一覧
-> - `設計ドキュメント/テーブル設計書.md` — Bronze層テーブル一覧
-> - `開発ドキュメント/Notebook仕様書.md` — 対象テーブル表
-> - `開発ドキュメント/notebooks/01_load_northwind_to_rds.py` — DDL/INSERT
-> - `開発ドキュメント/notebooks/02_etl_bronze_ingest.py` — source_tables
-> - `開発ドキュメント/テスト計画書.md` — 期待件数
+>
+> - `docs/02_design/01_基本設計・要件定義/要件定義書.md` — テーブル一覧
+> - `docs/02_design/03_データエンジニアリング設計/テーブル設計書.md` — Bronze層テーブル一覧
+> - `docs/03_development/00_初期環境構築手順_インフラ/Notebook仕様書.md` — 対象テーブル表
+> - `docs/03_development/00_初期環境構築手順_インフラ/notebooks/01_load_northwind_to_rds.py` — DDL/INSERT
+> - `docs/03_development/00_初期環境構築手順_インフラ/notebooks/02_etl_bronze_ingest.py` — source_tables
+> - `docs/03_development/02_テスト・検証/テスト計画書.md` — 期待件数
 
 ---
 
@@ -158,3 +190,5 @@ Phase 0: Databricks アカウント作成 + Account ID 取得
 | 2026-03-08 | 初版作成（マルチクラウド→シングルクラウドに設計変更） |
 | 2026-03-08 | 開発ドキュメント追加、pthom/northwind_psql 採用（14テーブル） |
 | 2026-03-09 | Flectブログ参照版として再作成。IAMロール2種、SG要件準拠、VPCエンドポイント追加 |
+| 2026-03-20 | フォルダ再構築：`設計ドキュメント/`・`開発ドキュメント/` → `docs/` 配下に分類体系化 |
+| 2026-03-22 | README.md をフォルダ再構築後の実態に合わせて全面更新 |
