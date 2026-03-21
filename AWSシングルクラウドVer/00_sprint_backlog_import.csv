@@ -1,0 +1,24 @@
+Task Name,Description,Section/Column,Priority
+AWS RDSとDatabricksをJDBC接続しデータ抽出のNotebook作成,"AWS RDS (Northwind) と Databricks をJDBC等で接続し、テーブルデータを抽出する Notebookを作成する。","Epic 1: データパイプラインの基礎構築",High
+メダリオンアーキテクチャ(Bronze/Silver/Gold)で保存,"抽出したデータを、Bronze、Silver、Gold の 3層アーキテクチャで Delta Table として保存する。","Epic 1: データパイプラインの基礎構築",High
+日次バッチ処理のジョブスケジュール設定,"Databricks Workflows (Job) を設定し1日1回RDSの最新データをDatabricksに取り込むスケジュール処理を自動化する。","Epic 1: データパイプラインの基礎構築",High
+Databricks SQLによるBIダッシュボード作成,"Databricks SQL を用いて、Northwind の売上や在庫状況を可視化する BI ダッシュボードを作成する。","Epic 2: ダッシュボードとコスト管理",Medium
+ダッシュボードのスケジュール配信・自動通知,"ダッシュボードのスケジュール配信機能を設定し定期送付する。","Epic 2: ダッシュボードとコスト管理",Medium
+システムテーブルを活用したコスト監視ダッシュボード作成,"Unity Catalog の System Tables をクエリしコスト試算ダッシュボードを作成する。","Epic 2: ダッシュボードとコスト管理",Medium
+Unity Catalogでの権限モデル・グループ設計,"Unity Catalog 管理下で新しいテストユーザー/グループ（例: Analyst, Marketing）を想定して権限モデルを設計する。","Epic 3: データガバナンスとセキュリティ",High
+ダイナミックビューによる列・行レベルセキュリティ実装,"特定のユーザーには Northwind従業員テーブルの特定カラムをマスキングするダイナミックビューを実装する。","Epic 3: データガバナンスとセキュリティ",High
+アクセス権限の挙動テストと証明,"実際の権限付与のテストを行い、意図したデータしか見えないことを証明する。","Epic 3: データガバナンスとセキュリティ",High
+業務DB更新用のStreamlit簡易フロントエンド作成,"Streamlitなどの簡易アプリを作成し利用者が直接RDSを更新できるようにする。","Epic 4: 業務アプリ統合",Medium
+E2Eのデータ反映・同期テスト,"アプリでの操作がDatabricks側に確実に反映・同期されていることをテストする。","Epic 4: 業務アプリ統合",Medium
+コスト最適化のためのインフラ起動/停止オーケストレーション,"Databricks Job開始前にLambda等でRDSを起動し終了後に停止させるオーケストレーションを組み込む。","Epic 4: 業務アプリ統合",Low
+MLアルゴリズムを用いた基本的な予測モデル作成,"Databricks MLのNotebookを使い過去データから売上予測などの機械学習モデルを作成する。","Epic 5: 機械学習",Medium
+MLflowによる実験トラッキングの実装,"MLflowを用いて実験のパラメータ、メトリクス、モデルアーティファクトをトラッキングする。","Epic 5: 機械学習",High
+モデルレジストリ(Staging/Production)によるライフサイクル管理,"モデルをMLflow Model Registryに登録しモデルのライフサイクル管理を体験する。","Epic 5: 機械学習",High
+DLTでの期待値(Expectations)によるデータ品質管理,"Delta Live Tables (DLT) に「Expectations（データ品質制約）」を追加し不正なデータを検知する。","Epic 6: データ品質とストリーミング",Medium
+Auto Loaderを用いたストリーミングデータパイプライン構築,"Databricks Auto Loader等を用いてS3からの継続的なストリーミング処理を構築する。","Epic 6: データ品質とストリーミング",Medium
+DABsを用いたインフラ・ジョブ定義のコード化,"Databricks Asset Bundles (DABs) を用いてJobやDLTの定義をコード(YAML)化する。","Epic 7: CI/CDとIaC",High
+GitHub ActionsよるデプロイCI/CDパイプライン構築,"GitHub Actions と連携させmainブランチへのプッシュで自動デプロイされるCI/CDパイプラインを構築する。","Epic 7: CI/CDとIaC",High
+TerraformによるIaC化(発展),"Terraform を用いてクラスターやUnity Catalogの権限設定などをコード(IaC)として管理する。","Epic 7: CI/CDとIaC",Low
+Unity Catalog上のビジネスメタデータ手動付与,"Unity Catalog上の各テーブルやカラムに対して、業務上の意味や用途を示すビジネスメタデータ（コメントやタグ）を手動で作成・付与する。","Epic 8: データディスカバリとAI",High
+タグ・キーワード検索によるデータ共有・探索の検証,"カタログ内でタグ検索やキーワード検索を行い、データ探索（ディスカバリ）の容易性が向上しているかをテストする。","Epic 8: データディスカバリとAI",Medium
+Databricks AI Assistを用いたメタデータの自動生成,"DatabricksのAI機能（AI Assist等）を活用して、テーブル定義やサンプルデータからビジネスメタデータを自動生成・提案させる処理を検証する。","Epic 8: データディスカバリとAI",High
