@@ -109,30 +109,44 @@ print("✅ ext_ops 作成完了")
 
 # MAGIC %md
 # MAGIC ## Step 3: Schema 作成
+# MAGIC
+# MAGIC 各レイヤーの管理場所（MANAGED LOCATION）をそれぞれのパス（S3）に明示的に指定してスキーマを作成します。
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC CREATE SCHEMA IF NOT EXISTS bronze
-# MAGIC COMMENT 'Raw data from source systems';
+spark.sql(f"""
+CREATE SCHEMA IF NOT EXISTS bronze
+MANAGED LOCATION 's3://{S3_BUCKET_NAME}/bronze/'
+COMMENT 'Raw data from source systems'
+""")
+print("✅ bronze スキーマ作成完了")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC CREATE SCHEMA IF NOT EXISTS silver
-# MAGIC COMMENT 'Cleansed and standardized data';
+spark.sql(f"""
+CREATE SCHEMA IF NOT EXISTS silver
+MANAGED LOCATION 's3://{S3_BUCKET_NAME}/silver/'
+COMMENT 'Cleansed and standardized data'
+""")
+print("✅ silver スキーマ作成完了")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC CREATE SCHEMA IF NOT EXISTS gold
-# MAGIC COMMENT 'Aggregated business-ready data';
+spark.sql(f"""
+CREATE SCHEMA IF NOT EXISTS gold
+MANAGED LOCATION 's3://{S3_BUCKET_NAME}/gold/'
+COMMENT 'Aggregated business-ready data'
+""")
+print("✅ gold スキーマ作成完了")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC CREATE SCHEMA IF NOT EXISTS ops
-# MAGIC COMMENT 'Operational logs, DQ results';
+spark.sql(f"""
+CREATE SCHEMA IF NOT EXISTS ops
+MANAGED LOCATION 's3://{S3_BUCKET_NAME}/ops/'
+COMMENT 'Operational logs, DQ results'
+""")
+print("✅ ops スキーマ作成完了")
 
 # COMMAND ----------
 
