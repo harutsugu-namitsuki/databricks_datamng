@@ -14,15 +14,21 @@ AWS Databricks 上で動作し、S3をストレージとして使用します。
 ```
 Unity Catalog
 └── northwind_catalog (カタログ)
-    ├── bronze (スキーマ)
+    ├── bronze (スキーマ) ← 全14テーブル
+    │   ├── categories
     │   ├── customers
+    │   ├── employees
+    │   ├── suppliers
+    │   ├── shippers
+    │   ├── products
     │   ├── orders
     │   ├── order_details
-    │   ├── products
-    │   ├── categories
-    │   ├── suppliers
-    │   ├── employees
-    │   └── shippers
+    │   ├── region
+    │   ├── territories
+    │   ├── us_states
+    │   ├── employee_territories
+    │   ├── customer_demographics
+    │   └── customer_customer_demo
     ├── silver (スキーマ)
     │   ├── customers
     │   ├── orders
@@ -82,12 +88,13 @@ Unity Catalog
 
 ## 4. External Location
 
-| 名前 | URL | Credential |
-|------|-----|------------|
-| `ext_bronze` | `s3://lake-northwind-<account-id>/bronze/` | aws_s3_credential |
-| `ext_silver` | `s3://lake-northwind-<account-id>/silver/` | aws_s3_credential |
-| `ext_gold` | `s3://lake-northwind-<account-id>/gold/` | aws_s3_credential |
-| `ext_ops` | `s3://lake-northwind-<account-id>/ops/` | aws_s3_credential |
+| 名前 | URL | Credential | 作成方法 |
+|------|-----|------------|---------|
+| `ext_northwind_catalog` | `s3://lake-northwind-<account-id>/catalog/` | aws_s3_credential | UIから作成（実装手順書 Step 2-5） |
+| `ext_bronze` | `s3://lake-northwind-<account-id>/bronze/` | aws_s3_credential | Notebook `00_setup_unity_catalog.py` |
+| `ext_silver` | `s3://lake-northwind-<account-id>/silver/` | aws_s3_credential | Notebook `00_setup_unity_catalog.py` |
+| `ext_gold` | `s3://lake-northwind-<account-id>/gold/` | aws_s3_credential | Notebook `00_setup_unity_catalog.py` |
+| `ext_ops` | `s3://lake-northwind-<account-id>/ops/` | aws_s3_credential | Notebook `00_setup_unity_catalog.py` |
 
 ### 作成SQL例
 
@@ -155,3 +162,4 @@ GRANT ALL PRIVILEGES ON SCHEMA northwind_catalog.ops TO engineer_group;
 |------|----------|
 | 2026-03-08 | シングルクラウド版として作成 |
 | 2026-03-09 | カタログロール指定を明記、バケット名テンプレート修正 |
+| 2026-03-22 | Notebook実装と同期: Bronzeスキーマを全14テーブルに拡大、ext_northwind_catalog (catalog/) を追加 |
