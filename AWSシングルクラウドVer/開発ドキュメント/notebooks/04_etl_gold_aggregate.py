@@ -20,8 +20,8 @@ print("✅ Gold Aggregate 開始")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC USE CATALOG northwind_catalog;
+spark.sql(f"USE CATALOG {CATALOG_NAME}")
+print(f"✅ current_catalog() = {spark.sql('SELECT current_catalog()').collect()[0][0]}")
 
 # COMMAND ----------
 
@@ -30,9 +30,9 @@ print("✅ Gold Aggregate 開始")
 
 # COMMAND ----------
 
-df_od = spark.table("silver.order_details")
-df_p = spark.table("silver.products")
-df_o = spark.table("silver.orders")
+df_od = spark.table(f"{CATALOG_NAME}.silver.order_details")
+df_p = spark.table(f"{CATALOG_NAME}.silver.products")
+df_o = spark.table(f"{CATALOG_NAME}.silver.orders")
 
 gold_sales_by_product = df_od \
     .join(df_p, "product_id") \
@@ -61,7 +61,7 @@ print(f"✅ gold.sales_by_product: {gold_sales_by_product.count()} 件")
 
 # COMMAND ----------
 
-df_c = spark.table("silver.customers")
+df_c = spark.table(f"{CATALOG_NAME}.silver.customers")
 
 gold_sales_by_customer = df_od \
     .join(df_o, "order_id") \
@@ -90,7 +90,7 @@ print(f"✅ gold.sales_by_customer: {gold_sales_by_customer.count()} 件")
 
 # COMMAND ----------
 
-df_cat = spark.table("bronze.categories") \
+df_cat = spark.table(f"{CATALOG_NAME}.bronze.categories") \
     .select("category_id", "category_name")
 
 gold_sales_by_category = df_od \
