@@ -6,10 +6,12 @@
 # レイヤー別シート構成の Excel ブックとして Volume に出力する。
 #
 # 出力イメージ:
-#   シート「bronze→」(空) → 「categories」→ 「customers」→ ...
-#   シート「silver→」(空) → 「customers」→ 「order_details」→ ...
-#   シート「gold→」(空)   → 「order_summary」→ ...
-#   シート「ops→」(空)    → 「dq_results」→ ...
+#   シート「gold→」(空) → 「order_summary (gold)」→ ...
+#   シート「silver→」(空) → 「customers (silver)」→ ...
+#   シート「bronze→」(空) → 「categories (bronze)」→ ...
+#   シート「ops→」(空)   → 「dq_results (ops)」→ ...
+#
+# 100行以下のテーブルは全量出力、それ以外はサンプル10行
 
 # COMMAND ----------
 
@@ -25,9 +27,10 @@ TARGET_CATALOG = "northwind_catalog"
 EXPORT_SCHEMA  = "exports"
 EXPORT_VOLUME  = "sample_data"
 SAMPLE_LIMIT   = 10
+FULL_EXPORT_THRESHOLD = 100  # この行数以下なら全量出力
 
-# レイヤー表示順（この順番でシートが並ぶ）
-LAYER_ORDER = ["bronze", "silver", "gold", "ops"]
+# レイヤー表示順（gold → silver → bronze → ops）
+LAYER_ORDER = ["gold", "silver", "bronze", "ops"]
 
 # 除外するスキーマ
 SKIP_SCHEMAS = {"information_schema", EXPORT_SCHEMA}
@@ -85,6 +88,7 @@ print(f"\n合計: {sum(len(v) for v in schema_tables.values())} テーブル")
 # 4. Excel ブック作成
 # ==========================================
 import pandas as pd
+from openpyxl.utils import get_column_letter
 from io import BytesIO
 
 buffer = BytesIO()
@@ -92,55 +96,70 @@ buffer = BytesIO()
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
     sheet_count = 0
 
-    for layer in LAYER_ORDER:
-        if layer not in schema_tables:
-            print(f"スキーマ {layer} はカタログに存在しないためスキップ")
-            continue
+    def write_layer(layer_name):
+        """指定レイヤーの区切りシート + テーブルシートを書き出す"""
+        nonlocal sheet_count
+
+        if layer_name not in schema_tables:
+            print(f"スキーマ {layer_name} はカタログに存在しないためスキップ")
+            return
 
         # レイヤー区切りシート（空）
-        separator_name = f"{layer}→"
+        separator_name = f"{layer_name}→"
         pd.DataFrame().to_excel(writer, sheet_name=separator_name, index=False)
         sheet_count += 1
         print(f"  シート: {separator_name} (区切り)")
 
         # テーブルごとにシート作成
-        for table_name in schema_tables[layer]:
-            full_name = f"{TARGET_CATALOG}.{layer}.{table_name}"
-            try:
-                sample_df = spark.sql(f"SELECT * FROM {full_name} LIMIT {SAMPLE_LIMIT}")
+        for table_name in schema_tables[layer_name]:
+            full_name = f"{TARGET_CATALOG}.{layer_name}.{table_name}"
+            sheet_name = f"{table_name} ({layer_name})"
 
-                if sample_df.isEmpty():
-                    print(f"  シート: {table_name} → データなし、スキップ")
+            try:
+                # まず全量の行数を確認
+                total_count = spark.sql(f"SELECT COUNT(*) AS cnt FROM {full_name}").collect()[0]["cnt"]
+
+                if total_count == 0:
+                    print(f"  シート: {sheet_name} → データなし、スキップ")
                     continue
 
+                # 100行以下なら全量、それ以外はサンプル
+                if total_count <= FULL_EXPORT_THRESHOLD:
+                    sample_df = spark.sql(f"SELECT * FROM {full_name}")
+                    mode = "全量"
+                else:
+                    sample_df = spark.sql(f"SELECT * FROM {full_name} LIMIT {SAMPLE_LIMIT}")
+                    mode = f"サンプル{SAMPLE_LIMIT}"
+
                 pdf = sample_df.toPandas()
-                pdf.to_excel(writer, sheet_name=table_name, index=False)
+                pdf.to_excel(writer, sheet_name=sheet_name, index=False)
                 sheet_count += 1
-                print(f"  シート: {table_name} ({len(pdf)} 行)")
+                print(f"  シート: {sheet_name} ({len(pdf)}/{total_count} 行, {mode})")
 
             except Exception as e:
-                print(f"  シート: {table_name} → エラー: {e}")
+                print(f"  シート: {sheet_name} → エラー: {e}")
+
+    # LAYER_ORDER 順にシート出力
+    for layer in LAYER_ORDER:
+        write_layer(layer)
 
     # LAYER_ORDER に含まれないスキーマがあれば末尾に追加
     extra_schemas = sorted(set(schema_tables.keys()) - set(LAYER_ORDER))
     for schema_name in extra_schemas:
-        separator_name = f"{schema_name}→"
-        pd.DataFrame().to_excel(writer, sheet_name=separator_name, index=False)
-        sheet_count += 1
-        print(f"  シート: {separator_name} (区切り)")
+        write_layer(schema_name)
 
-        for table_name in schema_tables[schema_name]:
-            full_name = f"{TARGET_CATALOG}.{schema_name}.{table_name}"
-            try:
-                sample_df = spark.sql(f"SELECT * FROM {full_name} LIMIT {SAMPLE_LIMIT}")
-                if sample_df.isEmpty():
-                    continue
-                pdf = sample_df.toPandas()
-                pdf.to_excel(writer, sheet_name=table_name, index=False)
-                sheet_count += 1
-                print(f"  シート: {table_name} ({len(pdf)} 行)")
-            except Exception as e:
-                print(f"  シート: {table_name} → エラー: {e}")
+    # --- 列幅の自動調整 ---
+    for ws in writer.book.worksheets:
+        for col_idx, col_cells in enumerate(ws.columns, 1):
+            max_length = 0
+            for cell in col_cells:
+                if cell.value is not None:
+                    cell_len = len(str(cell.value))
+                    if cell_len > max_length:
+                        max_length = cell_len
+            # 余白を少し足す（日本語は幅が広いので係数調整）
+            adjusted_width = min(max_length + 3, 50)
+            ws.column_dimensions[get_column_letter(col_idx)].width = adjusted_width
 
 print(f"\n合計 {sheet_count} シートを作成")
 
