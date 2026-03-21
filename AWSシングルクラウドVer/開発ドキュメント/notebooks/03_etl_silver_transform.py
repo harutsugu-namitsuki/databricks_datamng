@@ -21,8 +21,8 @@ print(f"✅ Silver Transform 開始 (load_date: {load_date})")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC USE CATALOG northwind_catalog;
+spark.sql(f"USE CATALOG {CATALOG_NAME}")
+print(f"✅ current_catalog() = {spark.sql('SELECT current_catalog()').collect()[0][0]}")
 
 # COMMAND ----------
 
@@ -31,7 +31,7 @@ print(f"✅ Silver Transform 開始 (load_date: {load_date})")
 
 # COMMAND ----------
 
-df_customers = spark.table("bronze.customers") \
+df_customers = spark.table(f"{CATALOG_NAME}.bronze.customers") \
     .filter(col("_load_date") == str(load_date))
 
 silver_customers = df_customers \
@@ -57,7 +57,7 @@ print(f"✅ silver.customers: {silver_customers.count()} 件")
 
 # COMMAND ----------
 
-df_orders = spark.table("bronze.orders") \
+df_orders = spark.table(f"{CATALOG_NAME}.bronze.orders") \
     .filter(col("_load_date") == str(load_date))
 
 silver_orders = df_orders \
@@ -82,7 +82,7 @@ print(f"✅ silver.orders: {silver_orders.count()} 件")
 
 # COMMAND ----------
 
-df_order_details = spark.table("bronze.order_details") \
+df_order_details = spark.table(f"{CATALOG_NAME}.bronze.order_details") \
     .filter(col("_load_date") == str(load_date))
 
 silver_order_details = df_order_details \
@@ -105,7 +105,7 @@ print(f"✅ silver.order_details: {silver_order_details.count()} 件")
 
 # COMMAND ----------
 
-df_products = spark.table("bronze.products") \
+df_products = spark.table(f"{CATALOG_NAME}.bronze.products") \
     .filter(col("_load_date") == str(load_date))
 
 silver_products = df_products \
