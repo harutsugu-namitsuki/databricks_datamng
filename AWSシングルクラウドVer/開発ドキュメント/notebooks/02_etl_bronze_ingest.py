@@ -13,7 +13,6 @@ import uuid
 from datetime import date, datetime
 
 # 設定
-S3_BUCKET_NAME = "lake-northwind-<account-id>"
 CATALOG_NAME = "northwind_catalog"
 SCHEMA_NAME = "bronze"
 
@@ -25,7 +24,7 @@ ingest_ts = datetime.now()
 print(f"✅ Bronze Ingest 開始")
 print(f"   run_id: {run_id}")
 print(f"   load_date: {load_date}")
-print(f"   S3 Bucket: {S3_BUCKET_NAME}")
+print(f"   Catalog: {CATALOG_NAME}.{SCHEMA_NAME}")
 
 # COMMAND ----------
 
