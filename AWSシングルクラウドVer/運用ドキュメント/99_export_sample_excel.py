@@ -94,12 +94,9 @@ from io import BytesIO
 buffer = BytesIO()
 
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-    sheet_count = 0
+    sheet_count = [0]  # nonlocal 回避のためリスト型で管理
 
     def write_layer(layer_name):
-        """指定レイヤーの区切りシート + テーブルシートを書き出す"""
-        nonlocal sheet_count
-
         if layer_name not in schema_tables:
             print(f"スキーマ {layer_name} はカタログに存在しないためスキップ")
             return
@@ -107,7 +104,7 @@ with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         # レイヤー区切りシート（空）
         separator_name = f"{layer_name}→"
         pd.DataFrame().to_excel(writer, sheet_name=separator_name, index=False)
-        sheet_count += 1
+        sheet_count[0] += 1
         print(f"  シート: {separator_name} (区切り)")
 
         # テーブルごとにシート作成
@@ -133,7 +130,7 @@ with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
 
                 pdf = sample_df.toPandas()
                 pdf.to_excel(writer, sheet_name=sheet_name, index=False)
-                sheet_count += 1
+                sheet_count[0] += 1
                 print(f"  シート: {sheet_name} ({len(pdf)}/{total_count} 行, {mode})")
 
             except Exception as e:
@@ -161,7 +158,7 @@ with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
             adjusted_width = min(max_length + 3, 50)
             ws.column_dimensions[get_column_letter(col_idx)].width = adjusted_width
 
-print(f"\n合計 {sheet_count} シートを作成")
+print(f"\n合計 {sheet_count[0]} シートを作成")
 
 # COMMAND ----------
 
