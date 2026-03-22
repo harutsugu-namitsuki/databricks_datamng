@@ -1,7 +1,8 @@
 # タグ分類体系（Epic 3 / Story 3-2）
 
 Unity Catalog のテーブルタグ・カラムタグの設計定義。
-`ALTER TABLE ... SET TAGS` / `ALTER TABLE ... ALTER COLUMN ... SET TAGS` で適用する。
+事前に Databricks UI（カタログ > 管理タグ）にて管理タグ（Governed Tags）として各タグキーと許容値を登録し、
+ノートブックから `ALTER TABLE ... SET TAGS` / `ALTER TABLE ... ALTER COLUMN ... SET TAGS` にて直接適用する。
 
 ---
 
@@ -22,6 +23,7 @@ Unity Catalog のテーブルタグ・カラムタグの設計定義。
 - **pii**: GDPR/個人情報保護の観点でPIIを含むテーブルを即座に特定するためのキー
 - **update_frequency**: データの鮮度や更新タイミングを把握するためのキー
 - **data_type**: マスタ/トランザクション/集計/ログの区別を明示するためのキー
+- **pii_type**: 個人情報の具体的な種別（氏名、住所、電話番号、写真等）を明示するためのキー
 
 ---
 

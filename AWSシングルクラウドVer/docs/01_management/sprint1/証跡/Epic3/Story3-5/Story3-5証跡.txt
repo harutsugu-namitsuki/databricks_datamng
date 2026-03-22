@@ -1,0 +1,77 @@
+リネージレコード数: 53
++--------------------------------------+-----------------------------------------------+-----------------------+
+|source_table_full_name                |target_table_full_name                         |event_time             |
++--------------------------------------+-----------------------------------------------+-----------------------+
+|NULL                                  |northwind_catalog.bronze.categories            |2026-03-21 08:13:58.108|
+|NULL                                  |northwind_catalog.bronze.customer_customer_demo|2026-03-21 08:14:50.132|
+|NULL                                  |northwind_catalog.bronze.customer_demographics |2026-03-21 08:14:47.024|
+|NULL                                  |northwind_catalog.bronze.customers             |2026-03-21 08:14:03.108|
+|NULL                                  |northwind_catalog.bronze.employee_territories  |2026-03-21 08:14:43.746|
+|NULL                                  |northwind_catalog.bronze.employees             |2026-03-21 08:14:08.954|
+|NULL                                  |northwind_catalog.bronze.order_details         |2026-03-21 08:14:29.815|
+|NULL                                  |northwind_catalog.bronze.orders                |2026-03-21 08:14:26.203|
+|NULL                                  |northwind_catalog.bronze.products              |2026-03-21 08:14:21.791|
+|NULL                                  |northwind_catalog.bronze.region                |2026-03-21 08:14:33.365|
+|NULL                                  |northwind_catalog.bronze.shippers              |2026-03-21 08:14:17.131|
+|NULL                                  |northwind_catalog.bronze.suppliers             |2026-03-21 08:14:13.32 |
+|NULL                                  |northwind_catalog.bronze.territories           |2026-03-21 08:14:37.119|
+|NULL                                  |northwind_catalog.bronze.us_states             |2026-03-21 08:14:40.675|
+|NULL                                  |northwind_catalog.ops.dq_results               |2026-03-21 08:31:31.552|
+|NULL                                  |northwind_catalog.ops.ingestion_log            |2026-03-21 08:14:55.152|
+|NULL                                  |northwind_catalog.ops.job_runs                 |2026-03-21 08:32:52.628|
+|northwind_catalog.bronze.categories   |NULL                                           |2026-03-21 08:32:39.872|
+|northwind_catalog.bronze.categories   |northwind_catalog.gold.sales_by_category       |2026-03-21 08:32:39.32 |
+|northwind_catalog.bronze.customers    |NULL                                           |2026-03-21 08:31:07.127|
+|northwind_catalog.bronze.customers    |NULL                                           |2026-03-21 08:31:24.018|
+|northwind_catalog.bronze.customers    |northwind_catalog.silver.customers             |2026-03-21 08:31:06.75 |
+|northwind_catalog.bronze.order_details|NULL                                           |2026-03-21 08:31:18.641|
+|northwind_catalog.bronze.order_details|NULL                                           |2026-03-21 08:31:27.328|
+|northwind_catalog.bronze.order_details|northwind_catalog.silver.order_details         |2026-03-21 08:31:18.286|
+|northwind_catalog.bronze.orders       |NULL                                           |2026-03-21 08:31:25.523|
+|northwind_catalog.bronze.orders       |NULL                                           |2026-03-21 08:31:24.841|
+|northwind_catalog.bronze.orders       |NULL                                           |2026-03-21 08:31:13.604|
+|northwind_catalog.bronze.orders       |northwind_catalog.silver.orders                |2026-03-21 08:31:13.375|
+|northwind_catalog.bronze.products     |NULL                                           |2026-03-21 08:31:23.294|
+|northwind_catalog.bronze.products     |northwind_catalog.silver.products              |2026-03-21 08:31:23.054|
+|northwind_catalog.silver.customers    |NULL                                           |2026-03-21 08:32:30.98 |
+|northwind_catalog.silver.customers    |northwind_catalog.gold.sales_by_customer       |2026-03-21 08:32:30.552|
+|northwind_catalog.silver.order_details|NULL                                           |2026-03-21 08:32:30.98 |
+|northwind_catalog.silver.order_details|NULL                                           |2026-03-21 08:32:48.292|
+|northwind_catalog.silver.order_details|NULL                                           |2026-03-21 08:32:21.534|
+|northwind_catalog.silver.order_details|NULL                                           |2026-03-21 08:32:39.872|
+|northwind_catalog.silver.order_details|northwind_catalog.gold.order_summary           |2026-03-21 08:32:47.977|
+|northwind_catalog.silver.order_details|northwind_catalog.gold.sales_by_category       |2026-03-21 08:32:39.32 |
+|northwind_catalog.silver.order_details|northwind_catalog.gold.sales_by_customer       |2026-03-21 08:32:30.552|
+|northwind_catalog.silver.order_details|northwind_catalog.gold.sales_by_product        |2026-03-21 08:32:21.116|
+|northwind_catalog.silver.orders       |NULL                                           |2026-03-21 08:32:21.534|
+|northwind_catalog.silver.orders       |NULL                                           |2026-03-21 08:32:39.872|
+|northwind_catalog.silver.orders       |NULL                                           |2026-03-21 08:32:48.292|
+|northwind_catalog.silver.orders       |NULL                                           |2026-03-21 08:32:30.98 |
+|northwind_catalog.silver.orders       |northwind_catalog.gold.order_summary           |2026-03-21 08:32:47.977|
+|northwind_catalog.silver.orders       |northwind_catalog.gold.sales_by_category       |2026-03-21 08:32:39.32 |
+|northwind_catalog.silver.orders       |northwind_catalog.gold.sales_by_customer       |2026-03-21 08:32:30.552|
+|northwind_catalog.silver.orders       |northwind_catalog.gold.sales_by_product        |2026-03-21 08:32:21.116|
+|northwind_catalog.silver.products     |NULL                                           |2026-03-21 08:32:21.534|
+|northwind_catalog.silver.products     |NULL                                           |2026-03-21 08:32:39.872|
+|northwind_catalog.silver.products     |northwind_catalog.gold.sales_by_category       |2026-03-21 08:32:39.32 |
+|northwind_catalog.silver.products     |northwind_catalog.gold.sales_by_product        |2026-03-21 08:32:21.116|
++--------------------------------------+-----------------------------------------------+-----------------------+
+
+  [PASS] northwind_catalog.bronze.customers → northwind_catalog.silver.customers
+  [PASS] northwind_catalog.bronze.orders → northwind_catalog.silver.orders
+  [PASS] northwind_catalog.bronze.order_details → northwind_catalog.silver.order_details
+  [PASS] northwind_catalog.bronze.products → northwind_catalog.silver.products
+  [PASS] northwind_catalog.silver.order_details → northwind_catalog.gold.sales_by_product
+  [PASS] northwind_catalog.silver.products → northwind_catalog.gold.sales_by_product
+  [PASS] northwind_catalog.silver.orders → northwind_catalog.gold.sales_by_product
+  [PASS] northwind_catalog.silver.order_details → northwind_catalog.gold.sales_by_customer
+  [PASS] northwind_catalog.silver.customers → northwind_catalog.gold.sales_by_customer
+  [PASS] northwind_catalog.silver.orders → northwind_catalog.gold.sales_by_customer
+  [PASS] northwind_catalog.silver.order_details → northwind_catalog.gold.sales_by_category
+  [PASS] northwind_catalog.silver.products → northwind_catalog.gold.sales_by_category
+  [PASS] northwind_catalog.silver.orders → northwind_catalog.gold.sales_by_category
+  [PASS] northwind_catalog.silver.order_details → northwind_catalog.gold.order_summary
+  [PASS] northwind_catalog.silver.orders → northwind_catalog.gold.order_summary
+  [PASS] northwind_catalog.bronze.categories → northwind_catalog.gold.sales_by_category
+
+検出: 16/16、未検出: 0/16

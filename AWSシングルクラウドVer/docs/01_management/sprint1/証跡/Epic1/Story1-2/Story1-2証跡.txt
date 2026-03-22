@@ -1,0 +1,83 @@
+03_etl_silver_transform.py
+✅ Silver Transform 開始 (load_date: 2026-03-22)
+✅ current_catalog() = northwind_catalog
+✅ silver.customers: 0 件
+✅ silver.orders: 0 件
+✅ silver.order_details: 0 件
+✅ silver.products: 0 件
+
+📊 DQ Check 結果:
+  ✅ null_check_company_name: PASS (fail_count: 0)
+  ✅ dup_check_order_id: PASS (fail_count: 0)
+  ✅ positive_unit_price: PASS (fail_count: 0)
+
+04_etl_gold_aggregate.py
+✅ Gold Aggregate 開始
+✅ current_catalog() = northwind_catalog
+✅ gold.sales_by_product: 0 件
+✅ gold.sales_by_customer: 0 件
+✅ gold.sales_by_category: 0 件
+✅ gold.order_summary: 0 件
+✅ ジョブ完了ログを記録しました
+
+nb_e1_01_verify_idempotency.py（セル3）
+スナップショット取得時刻: 2026-03-22 10:21:24
+
+テーブル                                                件数
+-------------------------------------------------------
+  bronze.categories                                 16
+  bronze.customers                                 182
+  bronze.employees                                  18
+  bronze.suppliers                                  58
+  bronze.shippers                                   12
+  bronze.products                                  154
+  bronze.orders                                  1,660
+  bronze.order_details                           4,310
+  bronze.region                                      8
+  bronze.territories                               106
+  bronze.us_states                                 102
+  bronze.employee_territories                       98
+  bronze.customer_demographics                       0
+  bronze.customer_customer_demo                      0
+  silver.customers                                   0
+  silver.orders                                      0
+  silver.order_details                               0
+  silver.products                                    0
+  gold.sales_by_product                              0
+  gold.sales_by_customer                             0
+  gold.sales_by_category                             0
+  gold.order_summary                                 0
+
+📋 このセルの出力を記録し、パイプライン2回実行後に再実行して件数を比較してください。
+   Bronze件数が変化しない = 冪等性OK
+
+============================================================
+本日（2026-03-22）分 Bronze件数確認
+============================================================
+  bronze.categories                     2026-03-22:      0 件
+  bronze.customers                      2026-03-22:      0 件
+  bronze.employees                      2026-03-22:      0 件
+  bronze.suppliers                      2026-03-22:      0 件
+  bronze.shippers                       2026-03-22:      0 件
+  bronze.products                       2026-03-22:      0 件
+  bronze.orders                         2026-03-22:      0 件
+  bronze.order_details                  2026-03-22:      0 件
+  bronze.region                         2026-03-22:      0 件
+  bronze.territories                    2026-03-22:      0 件
+  bronze.us_states                      2026-03-22:      0 件
+  bronze.employee_territories           2026-03-22:      0 件
+  bronze.customer_demographics          2026-03-22:      0 件
+  bronze.customer_customer_demo         2026-03-22:      0 件
+
+📋 Bronze を2回実行しても上記の件数が変わらなければ冪等性OK
+
+
+============================================================
+Silver層 主キーユニーク確認
+============================================================
+  [PASS] silver.customers: 0 件（重複なし）
+  [PASS] silver.orders: 0 件（重複なし）
+  [PASS] silver.order_details: 0 件（重複なし）
+  [PASS] silver.products: 0 件（重複なし）
+
+✅ Silver層 冪等性確認OK

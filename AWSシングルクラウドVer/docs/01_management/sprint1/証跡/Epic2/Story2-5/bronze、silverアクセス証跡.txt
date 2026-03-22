@@ -1,0 +1,11 @@
+-- Bronze へのアクセス（PERMISSION_DENIED になること）
+SELECT * FROM northwind_catalog.bronze.orders LIMIT 1;
+
+[INSUFFICIENT_PERMISSIONS] Insufficient privileges:
+User does not have USE SCHEMA on Schema 'northwind_catalog.bronze'. SQLSTATE: 42501
+
+-- Silver へのアクセス（PERMISSION_DENIED になること）
+SELECT * FROM northwind_catalog.silver.customers LIMIT 1;
+
+[INSUFFICIENT_PERMISSIONS] Insufficient privileges:
+User does not have USE SCHEMA on Schema 'northwind_catalog.silver'. SQLSTATE: 42501

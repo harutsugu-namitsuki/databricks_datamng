@@ -109,21 +109,36 @@ CREATE EXTERNAL LOCATION ext_bronze
 
 ## 5. アクセス制御
 
-### 5.1 ロール設計
+### 5.1 グループ設計
 
-| ロール | 権限 |
-|--------|------|
-| data_engineer | Bronze/Silver/Gold/Ops の読み書き |
-| data_analyst | Gold の読み取りのみ |
-| admin | 全権限 |
+Databricks Unity Catalog ではグループ単位で権限を管理する。グループの作成・メンバー追加は **Databricks UI で行う**（SQL 不可）。
 
-### 5.2 権限付与例
+| グループ | 想定ユーザー | アクセス範囲 | 実装スプリント |
+|---------|------------|------------|--------------|
+| `analyst_group` | データアナリスト | Gold 層のみ（SELECT） | Sprint 1 ✅ |
+| `marketing_group` | マーケティング担当 | 特定ビューのみ（動的マスキング経由） | Sprint 5 |
+| `engineer_group` | データエンジニア | 全層フルアクセス | Sprint 5（現在は admin が相当） |
+
+### 5.2 権限付与（analyst_group / Sprint 1 実装済み）
+
+Unity Catalog ではスキーマのデータにアクセスするために **3段階の権限**が必要。
 
 ```sql
--- Analystにgoldスキーマの読み取り権限を付与
+-- ① カタログへの入口（これがないと配下スキーマにも辿り着けない）
+GRANT USE CATALOG ON CATALOG northwind_catalog TO analyst_group;
+
+-- ② Gold スキーマへの入口
+GRANT USE SCHEMA ON SCHEMA northwind_catalog.gold TO analyst_group;
+
+-- ③ Gold スキーマのデータを読む権限
 GRANT SELECT ON SCHEMA northwind_catalog.gold TO analyst_group;
 
--- DataEngineerに全スキーマの権限を付与
+-- ※ bronze / silver / ops は付与しない（Unity Catalog はデフォルト拒否）
+```
+
+**engineer_group 権限付与例（Sprint 5 で実施予定）:**
+
+```sql
 GRANT ALL PRIVILEGES ON SCHEMA northwind_catalog.bronze TO engineer_group;
 GRANT ALL PRIVILEGES ON SCHEMA northwind_catalog.silver TO engineer_group;
 GRANT ALL PRIVILEGES ON SCHEMA northwind_catalog.gold TO engineer_group;
@@ -132,14 +147,14 @@ GRANT ALL PRIVILEGES ON SCHEMA northwind_catalog.ops TO engineer_group;
 
 ### 5.3 方針
 
-| スキーマ | Analyst | DataEngineer | Admin |
-|---------|---------|-------------|-------|
-| bronze | ❌ アクセス不可 | ✅ 読み書き | ✅ 全権限 |
-| silver | ❌ アクセス不可 | ✅ 読み書き | ✅ 全権限 |
-| gold | ✅ 読み取りのみ | ✅ 読み書き | ✅ 全権限 |
-| ops | ✅ 読み取りのみ | ✅ 読み書き | ✅ 全権限 |
+| スキーマ | analyst_group | engineer_group | Admin |
+|---------|--------------|----------------|-------|
+| bronze | ❌ アクセス不可 | ✅ 読み書き（Sprint 5） | ✅ 全権限 |
+| silver | ❌ アクセス不可 | ✅ 読み書き（Sprint 5） | ✅ 全権限 |
+| gold | ✅ 読み取りのみ（Sprint 1） | ✅ 読み書き（Sprint 5） | ✅ 全権限 |
+| ops | ❌ アクセス不可 | ✅ 読み書き（Sprint 5） | ✅ 全権限 |
 
-> Bronze/Silverは原則Analystに見せない（誤解・個人情報混入対策）。必要に応じてGoldにマスキングView経由で公開。
+> Bronze/Silver は原則 Analyst に見せない（個人情報混入対策）。必要に応じて Gold に動的マスキング View 経由で公開（Sprint 5 / Story 2-3）。
 
 ---
 
@@ -163,3 +178,4 @@ GRANT ALL PRIVILEGES ON SCHEMA northwind_catalog.ops TO engineer_group;
 | 2026-03-08 | シングルクラウド版として作成 |
 | 2026-03-09 | カタログロール指定を明記、バケット名テンプレート修正 |
 | 2026-03-22 | Notebook実装と同期: Bronzeスキーマを全14テーブルに拡大、ext_northwind_catalog (catalog/) を追加 |
+| 2026-03-22 | アクセス制御を Sprint 1 実装内容に合わせて更新: グループ名を analyst_group に統一、USE CATALOG/USE SCHEMA の3段階 GRANT を明記、ops を Analyst アクセス不可に修正、Sprint 実装状況を追記 |

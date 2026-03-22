@@ -66,17 +66,43 @@ Unity Catalog 上の全テーブル・主要カラムに対して、業務上の
 
 [epic3_タグ分類体系.md](epic3_タグ分類体系.md) を開き、タグキー定義とマッピング表を確認する。
 
-### Step 2-2: テーブルタグ付与（全25テーブル）
+### Step 2-2: UIでの管理タグ（Governed Tags）定義
 
-`nb_02_tags.py`
+コードを実行する前に、以下の手順でDatabricksのUI上でタグポリシーを定義する。
+1. 左メニューから **Catalog**（Catalog Explorer）を開く。
+2. 上部の **管理タグ (Governed Tags)** をクリックする。
+3. **「管理タグを作成」** をクリックし、以下の **キー** と **許可する値** を登録する。
 
-### Step 2-3: PII カラムタグ付与
+| タグキー | 許可する値（ALLOWED VALUES） |
+|---------|-----------------------------|
+| `domain` | `sales`, `product`, `customer`, `employee`, `logistics`, `operations`, `reference` |
+| `layer` | `bronze`, `silver`, `gold`, `ops` |
+| `pii` | `true`, `false` |
+| `update_frequency` | `daily`, `one_time`, `append` |
+| `data_type` | `master`, `transaction`, `aggregate`, `log`, `reference` |
+| `pii_type` | `name`, `birth_date`, `address`, `phone`, `photo` |
 
-`nb_02_tags.py`
+> **💡 ヒント:** カンマ区切りで入力せず、一つずつ追加してください。単一テーブルのタグ設定ではなく、システム全体の「ルール」の定義です。
+### タグキーの設計思想
 
-### Step 2-4: 付与結果の確認
+- **domain**: ビジネスユーザーが「売上に関するテーブル」「従業員に関するテーブル」のようにドメイン単位で検索するためのキー
+- **layer**: メダリオンアーキテクチャのどの層に属するかを明示。Catalog Explorer での絞り込みに使用
+- **pii**: GDPR/個人情報保護の観点でPIIを含むテーブルを即座に特定するためのキー
+- **update_frequency**: データの鮮度や更新タイミングを把握するためのキー
+- **data_type**: マスタ/トランザクション/集計/ログの区別を明示するためのキー
+- **pii_type**: 個人情報の具体的な種別（氏名、住所、電話番号、写真等）を明示するためのキー
 
-`nb_02_tags.py`
+### Step 2-3: テーブルタグの付与（全25テーブル）
+
+`nb_02_tags.py` （Step 2-1 セル）
+
+### Step 2-4: PII カラムタグの付与
+
+`nb_02_tags.py` （Step 2-2 セル）
+
+### Step 2-5: 付与結果の確認
+
+`nb_02_tags.py` （Step 2-3 セル）
 
 ---
 
@@ -288,7 +314,7 @@ Phase 1（Story 3-1）: コメント付与
   └── Step 1-2 → 1-3 → 1-4
         ↓
 Phase 2（Story 3-2）: タグ付与
-  └── Step 2-2 → 2-3 → 2-4
+  └── Step 2-2(UI) → 2-3 → 2-4 → 2-5
         ↓
 Phase 3（Story 3-3）: 検索検証
   └── Step 3-1 → 3-2 → 3-3 → 3-4 → 3-5 → 3-6（UI）

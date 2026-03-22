@@ -1,0 +1,3 @@
+Principal,ActionType,ObjectType,ObjectKey
+analyst_group,SELECT,SCHEMA,northwind_catalog.gold
+analyst_group,USE SCHEMA,SCHEMA,northwind_catalog.gold

@@ -6,9 +6,12 @@
 # 最後にsystem.information_schemaのビューを検索し、タグが正しく付与されたかをクエリで確認・集計します。
 
 # COMMAND ----------
-# Step 2-2: テーブルタグ付与（全25テーブル）
+# Step 2-1: テーブルタグ付与（全25テーブル）
+# ※事前にCatalog Explorer UI（管理タグ）にてキーと許容値を定義しておくこと
 
 CATALOG_NAME = "northwind_catalog"
+
+
 
 # ── テーブルタグ定義 ──
 table_tags = {
@@ -52,7 +55,7 @@ for table_fqn, tags in table_tags.items():
 print(f"\nテーブルタグ付与完了: {len(table_tags)} テーブル")
 
 # COMMAND ----------
-# Step 2-3: PII カラムタグ付与
+# Step 2-2: PII カラムタグ付与
 
 # ── PIIカラムタグ定義 ──
 pii_column_tags = {
@@ -86,7 +89,7 @@ for table_fqn, columns in pii_column_tags.items():
 print("\nPIIカラムタグ付与完了")
 
 # COMMAND ----------
-# Step 2-4: 付与結果の確認
+# Step 2-3: 付与結果の確認
 
 # テーブルタグの確認
 print("=" * 70)

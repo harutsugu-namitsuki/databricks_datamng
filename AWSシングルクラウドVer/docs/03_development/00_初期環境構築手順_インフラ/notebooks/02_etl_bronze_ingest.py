@@ -94,7 +94,6 @@ for table_name in source_tables:
         df_with_meta.write \
             .format("delta") \
             .mode("overwrite") \
-            .option("replaceWhere", f"_load_date = '{load_date}'") \
             .saveAsTable(bronze_table)
 
         row_count = df.count()
