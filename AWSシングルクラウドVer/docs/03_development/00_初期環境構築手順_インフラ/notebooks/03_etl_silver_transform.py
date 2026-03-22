@@ -32,7 +32,8 @@ print(f"✅ current_catalog() = {spark.sql('SELECT current_catalog()').collect()
 # COMMAND ----------
 
 df_customers = spark.table(f"{CATALOG_NAME}.bronze.customers") \
-    .filter(col("_load_date") == str(load_date))
+    .filter(col("_load_date") == str(load_date)) \
+    .dropDuplicates(["customer_id"])
 
 silver_customers = df_customers \
     .withColumn("company_name", trim(col("company_name"))) \
@@ -58,7 +59,8 @@ print(f"✅ silver.customers: {silver_customers.count()} 件")
 # COMMAND ----------
 
 df_orders = spark.table(f"{CATALOG_NAME}.bronze.orders") \
-    .filter(col("_load_date") == str(load_date))
+    .filter(col("_load_date") == str(load_date)) \
+    .dropDuplicates(["order_id"])
 
 silver_orders = df_orders \
     .withColumn("order_date", col("order_date").cast("date")) \
@@ -83,7 +85,8 @@ print(f"✅ silver.orders: {silver_orders.count()} 件")
 # COMMAND ----------
 
 df_order_details = spark.table(f"{CATALOG_NAME}.bronze.order_details") \
-    .filter(col("_load_date") == str(load_date))
+    .filter(col("_load_date") == str(load_date)) \
+    .dropDuplicates(["order_id", "product_id"])
 
 silver_order_details = df_order_details \
     .withColumn("unit_price", col("unit_price").cast("decimal(10,2)")) \
@@ -106,7 +109,8 @@ print(f"✅ silver.order_details: {silver_order_details.count()} 件")
 # COMMAND ----------
 
 df_products = spark.table(f"{CATALOG_NAME}.bronze.products") \
-    .filter(col("_load_date") == str(load_date))
+    .filter(col("_load_date") == str(load_date)) \
+    .dropDuplicates(["product_id"])
 
 silver_products = df_products \
     .withColumn("product_name", trim(col("product_name"))) \

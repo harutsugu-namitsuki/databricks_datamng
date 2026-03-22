@@ -1,0 +1,118 @@
+  [OK] bronze.categories
+  [OK] bronze.customers
+  [OK] bronze.employees
+  [OK] bronze.suppliers
+  [OK] bronze.shippers
+  [OK] bronze.products
+  [OK] bronze.region
+  [OK] bronze.orders
+  [OK] bronze.order_details
+  [OK] bronze.territories
+  [OK] bronze.us_states
+  [OK] bronze.employee_territories
+  [OK] bronze.customer_demographics
+  [OK] bronze.customer_customer_demo
+  [OK] silver.customers
+  [OK] silver.orders
+  [OK] silver.order_details
+  [OK] silver.products
+  [OK] gold.sales_by_product
+  [OK] gold.sales_by_customer
+  [OK] gold.sales_by_category
+  [OK] gold.order_summary
+  [OK] ops.job_runs
+  [OK] ops.ingestion_log
+  [OK] ops.dq_results
+
+テーブルコメント付与完了: 25 テーブル
+  [OK] bronze.categories: 4 カラム
+  [OK] bronze.customers: 11 カラム
+  [OK] bronze.employees: 18 カラム
+  [OK] bronze.suppliers: 12 カラム
+  [OK] bronze.shippers: 3 カラム
+  [OK] bronze.products: 10 カラム
+  [OK] bronze.region: 2 カラム
+  [OK] bronze.orders: 14 カラム
+  [OK] bronze.order_details: 5 カラム
+  [OK] bronze.territories: 3 カラム
+  [OK] bronze.us_states: 4 カラム
+  [OK] bronze.employee_territories: 2 カラム
+  [OK] bronze.customer_demographics: 2 カラム
+  [OK] bronze.customer_customer_demo: 2 カラム
+
+Bronze層カラムコメント付与完了: 148 カラム
+  [OK] silver.customers: 11 カラム
+  [OK] silver.orders: 14 カラム
+  [OK] silver.order_details: 6 カラム
+  [OK] silver.products: 10 カラム
+
+Silver層カラムコメント付与完了: 41 カラム
+  [OK] gold.sales_by_product: 7 カラム
+  [OK] gold.sales_by_customer: 8 カラム
+  [OK] gold.sales_by_category: 7 カラム
+  [OK] gold.order_summary: 4 カラム
+
+Gold層カラムコメント付与完了: 26 カラム
+  [OK] ops.job_runs: 7 カラム
+  [OK] ops.ingestion_log: 6 カラム
+  [OK] ops.dq_results: 6 カラム
+
+Ops層カラムコメント付与完了: 19 カラム
+======================================================================
+テーブルコメント一覧
+======================================================================
+  bronze.categories: カテゴリマスタ（Raw）。商品を分類するカテゴリ情報。RDS PostgreSQLから日次取り込み。
+  bronze.customer_customer_demo: 顧客デモ関連（Raw）。顧客とデモグラフィクスの関連テーブル。現在データなし。RDSから日次取り込み。
+  bronze.customer_demographics: 顧客デモグラフィクス（Raw）。顧客の属性分類定義。現在データなし。RDSから日次取り込み。
+  bronze.customers: 顧客マスタ（Raw）。取引先企業の基本情報（社名・担当者・住所）。担当者氏名・連絡先等の個人情報を含む。RDSから日次取り込み。
+  bronze.employee_territories: 従業員テリトリ関連（Raw）。従業員とテリトリの多対多関連テーブル。RDSから日次取り込み。
+  bronze.employees: 従業員マスタ（Raw）。Northwind社の従業員情報（氏名・役職・連絡先）。個人情報を含む。RDSから日次取り込み。
+  bronze.order_details: 受注明細データ（Raw）。注文ごとの商品明細（商品ID・単価・数量・割引）。約2,155件。RDSから日次取り込み。
+  bronze.orders: 受注データ（Raw）。顧客からの注文ヘッダ情報（注文日・配送先・運賃）。約830件。RDSから日次取り込み。
+  bronze.products: 商品マスタ（Raw）。販売商品の基本情報（商品名・価格・在庫数）。RDSから日次取り込み。
+  bronze.region: 地域マスタ（Raw）。米国の地域区分（Eastern, Western等）。RDSから日次取り込み。
+  bronze.shippers: 配送業者マスタ（Raw）。注文の配送を担当する業者情報。RDSから日次取り込み。
+  bronze.suppliers: 仕入先マスタ（Raw）。商品の仕入先企業情報。RDSから日次取り込み。
+  bronze.territories: テリトリマスタ（Raw）。営業担当エリアの定義。地域（region）に紐づく。RDSから日次取り込み。
+  bronze.us_states: 米国州マスタ（Raw）。米国の州名・略称・地域区分。参照用マスタ。RDSから日次取り込み。
+  silver.customers: 顧客マスタ（クレンジング済み）。文字列トリム・国名大文字化・NULL補完済み。担当者氏名・連絡先等の個人情報を含む。分析用途に適した品質。
+  silver.order_details: 受注明細（クレンジング済み）。金額をDECIMAL変換済み。line_total（明細売上額）を計算追加。
+  silver.orders: 受注データ（クレンジング済み）。日付型変換・運賃NULL→0補完・配送先国名大文字化済み。
+  silver.products: 商品マスタ（クレンジング済み）。商品名トリム・単価DECIMAL変換・在庫数NULL→0補完済み。
+  gold.order_summary: 日次受注サマリ。日別の明細件数・売上合計・平均明細単価を集計したマートテーブル。
+  gold.sales_by_category: カテゴリ別月次売上集計。カテゴリ×年月の粒度で売上額・数量・注文件数を集計したマートテーブル。
+  gold.sales_by_customer: 顧客別月次売上集計。顧客×年月の粒度で売上額・注文件数・平均注文額を集計したマートテーブル。
+  gold.sales_by_product: 商品別月次売上集計。商品×年月の粒度で売上額・数量・注文件数を集計したマートテーブル。
+  ops.dq_results: データ品質チェック結果。DQルールごとの違反件数・閾値・判定結果（PASS/FAIL）を記録。
+  ops.ingestion_log: テーブル別取り込みログ。Bronze層への取り込み件数・所要時間・成否を記録。
+  ops.job_runs: ジョブ実行ログ。ETLノートブックの実行開始・終了時刻、成否ステータスを記録。
+  ops.metadata_comparison_manual: (なし)
+
+======================================================================
+カラムコメント確認（サンプル: bronze.employees）
+======================================================================
++-----------------+------------+----------------------------------------+
+|col_name         |data_type   |comment                                 |
++-----------------+------------+----------------------------------------+
+|employee_id      |smallint    |従業員ID（主キー）                      |
+|last_name        |varchar(20) |姓                                      |
+|first_name       |varchar(10) |名                                      |
+|title            |varchar(30) |役職（例: Sales Representative）        |
+|title_of_courtesy|varchar(25) |敬称（Mr./Ms./Dr.）                     |
+|birth_date       |date        |生年月日【PII】                         |
+|hire_date        |date        |入社日                                  |
+|address          |varchar(60) |自宅住所【PII】                         |
+|city             |varchar(15) |居住都市                                |
+|region           |varchar(15) |居住地域                                |
+|postal_code      |varchar(10) |居住郵便番号                            |
+|country          |varchar(15) |居住国                                  |
+|home_phone       |varchar(24) |自宅電話番号【PII】                     |
+|extension        |varchar(4)  |内線番号                                |
+|photo            |binary      |顔写真（バイナリ）【PII】               |
+|notes            |string      |経歴・備考                              |
+|reports_to       |smallint    |上司の従業員ID（自己結合外部キー）      |
+|photo_path       |varchar(255)|写真ファイルパス                        |
+|_run_id          |string      |ジョブ実行ID（UUID、同一バッチの識別子）|
+|_load_date       |string      |取り込み基準日（DATE型）                |
++-----------------+------------+----------------------------------------+
+only showing top 20 rows

@@ -1,0 +1,72 @@
++-----------+-----------------+
+|schema_name|table_name       |
++-----------+-----------------+
+|bronze     |order_details    |
+|bronze     |orders           |
+|gold       |order_summary    |
+|gold       |sales_by_category|
+|gold       |sales_by_customer|
+|gold       |sales_by_product |
+|silver     |order_details    |
+|silver     |orders           |
++-----------+-----------------+
+
+[PASS] テスト1: domain:sales で 8 テーブル検出
++-----------+----------+
+|schema_name|table_name|
++-----------+----------+
+|bronze     |customers |
+|bronze     |employees |
+|silver     |customers |
++-----------+----------+
+
+[PASS] テスト2a: pii:true で 3 テーブル検出
++-----------+----------+------------+--------+---------+
+|schema_name|table_name|column_name |tag_name|tag_value|
++-----------+----------+------------+--------+---------+
+|bronze     |customers |address     |pii     |true     |
+|bronze     |employees |address     |pii     |true     |
+|silver     |customers |address     |pii     |true     |
+|bronze     |employees |birth_date  |pii     |true     |
+|bronze     |customers |contact_name|pii     |true     |
+|silver     |customers |contact_name|pii     |true     |
+|silver     |customers |fax         |pii     |true     |
+|bronze     |customers |fax         |pii     |true     |
+|bronze     |employees |home_phone  |pii     |true     |
+|silver     |customers |phone       |pii     |true     |
+|bronze     |customers |phone       |pii     |true     |
+|bronze     |employees |photo       |pii     |true     |
++-----------+----------+------------+--------+---------+
+
+[PASS] テスト2b: PIIカラム 12 件検出
++-----------+-----------------+
+|schema_name|table_name       |
++-----------+-----------------+
+|gold       |order_summary    |
+|gold       |sales_by_category|
+|gold       |sales_by_customer|
+|gold       |sales_by_product |
++-----------+-----------------+
+
+[PASS] テスト3: data_type:aggregate で 4 テーブル検出
++------------+-----------------+---------------------------------------------------------------------------------------------+
+|table_schema|table_name       |comment                                                                                      |
++------------+-----------------+---------------------------------------------------------------------------------------------+
+|gold        |order_summary    |日次受注サマリ。日別の明細件数・売上合計・平均明細単価を集計したマートテーブル。             |
+|gold        |sales_by_category|カテゴリ別月次売上集計。カテゴリ×年月の粒度で売上額・数量・注文件数を集計したマートテーブル。|
+|gold        |sales_by_customer|顧客別月次売上集計。顧客×年月の粒度で売上額・注文件数・平均注文額を集計したマートテーブル。  |
+|gold        |sales_by_product |商品別月次売上集計。商品×年月の粒度で売上額・数量・注文件数を集計したマートテーブル。        |
+|silver      |order_details    |受注明細（クレンジング済み）。金額をDECIMAL変換済み。line_total（明細売上額）を計算追加。    |
++------------+-----------------+---------------------------------------------------------------------------------------------+
+
+[PASS] テスト4: キーワード '売上' で 5 テーブル検出
++-----------+-----------------+
+|schema_name|table_name       |
++-----------+-----------------+
+|gold       |order_summary    |
+|gold       |sales_by_category|
+|gold       |sales_by_customer|
+|gold       |sales_by_product |
++-----------+-----------------+
+
+[PASS] テスト5: layer:gold AND domain:sales で 4 テーブル検出

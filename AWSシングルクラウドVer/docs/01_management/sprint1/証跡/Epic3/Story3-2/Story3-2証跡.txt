@@ -1,0 +1,209 @@
+  [OK] bronze.categories: 5 タグ
+  [OK] bronze.customers: 5 タグ
+  [OK] bronze.employees: 5 タグ
+  [OK] bronze.suppliers: 5 タグ
+  [OK] bronze.shippers: 5 タグ
+  [OK] bronze.products: 5 タグ
+  [OK] bronze.region: 5 タグ
+  [OK] bronze.orders: 5 タグ
+  [OK] bronze.order_details: 5 タグ
+  [OK] bronze.territories: 5 タグ
+  [OK] bronze.us_states: 5 タグ
+  [OK] bronze.employee_territories: 5 タグ
+  [OK] bronze.customer_demographics: 5 タグ
+  [OK] bronze.customer_customer_demo: 5 タグ
+  [OK] silver.customers: 5 タグ
+  [OK] silver.orders: 5 タグ
+  [OK] silver.order_details: 5 タグ
+  [OK] silver.products: 5 タグ
+  [OK] gold.sales_by_product: 5 タグ
+  [OK] gold.sales_by_customer: 5 タグ
+  [OK] gold.sales_by_category: 5 タグ
+  [OK] gold.order_summary: 5 タグ
+  [OK] ops.job_runs: 5 タグ
+  [OK] ops.ingestion_log: 5 タグ
+  [OK] ops.dq_results: 5 タグ
+
+テーブルタグ付与完了: 25 テーブル
+  [OK] bronze.customers.contact_name: {'pii': 'true', 'pii_type': 'name'}
+  [OK] bronze.customers.address: {'pii': 'true', 'pii_type': 'address'}
+  [OK] bronze.customers.phone: {'pii': 'true', 'pii_type': 'phone'}
+  [OK] bronze.customers.fax: {'pii': 'true', 'pii_type': 'phone'}
+  [OK] bronze.employees.birth_date: {'pii': 'true', 'pii_type': 'birth_date'}
+  [OK] bronze.employees.address: {'pii': 'true', 'pii_type': 'address'}
+  [OK] bronze.employees.home_phone: {'pii': 'true', 'pii_type': 'phone'}
+  [OK] bronze.employees.photo: {'pii': 'true', 'pii_type': 'photo'}
+  [OK] silver.customers.contact_name: {'pii': 'true', 'pii_type': 'name'}
+  [OK] silver.customers.address: {'pii': 'true', 'pii_type': 'address'}
+  [OK] silver.customers.phone: {'pii': 'true', 'pii_type': 'phone'}
+  [OK] silver.customers.fax: {'pii': 'true', 'pii_type': 'phone'}
+
+PIIカラムタグ付与完了
+======================================================================
+テーブルタグ一覧
+======================================================================
++-----------+----------------------+----------------+-----------+
+|schema_name|table_name            |tag_name        |tag_value  |
++-----------+----------------------+----------------+-----------+
+|bronze     |categories            |data_type       |master     |
+|bronze     |categories            |domain          |product    |
+|bronze     |categories            |layer           |bronze     |
+|bronze     |categories            |pii             |false      |
+|bronze     |categories            |update_frequency|daily      |
+|bronze     |customer_customer_demo|data_type       |reference  |
+|bronze     |customer_customer_demo|domain          |customer   |
+|bronze     |customer_customer_demo|layer           |bronze     |
+|bronze     |customer_customer_demo|pii             |false      |
+|bronze     |customer_customer_demo|update_frequency|daily      |
+|bronze     |customer_demographics |data_type       |reference  |
+|bronze     |customer_demographics |domain          |customer   |
+|bronze     |customer_demographics |layer           |bronze     |
+|bronze     |customer_demographics |pii             |false      |
+|bronze     |customer_demographics |update_frequency|daily      |
+|bronze     |customers             |data_type       |master     |
+|bronze     |customers             |domain          |customer   |
+|bronze     |customers             |layer           |bronze     |
+|bronze     |customers             |pii             |true       |
+|bronze     |customers             |update_frequency|daily      |
+|bronze     |employee_territories  |data_type       |reference  |
+|bronze     |employee_territories  |domain          |employee   |
+|bronze     |employee_territories  |layer           |bronze     |
+|bronze     |employee_territories  |pii             |false      |
+|bronze     |employee_territories  |update_frequency|daily      |
+|bronze     |employees             |data_type       |master     |
+|bronze     |employees             |domain          |employee   |
+|bronze     |employees             |layer           |bronze     |
+|bronze     |employees             |pii             |true       |
+|bronze     |employees             |update_frequency|daily      |
+|bronze     |order_details         |data_type       |transaction|
+|bronze     |order_details         |domain          |sales      |
+|bronze     |order_details         |layer           |bronze     |
+|bronze     |order_details         |pii             |false      |
+|bronze     |order_details         |update_frequency|daily      |
+|bronze     |orders                |data_type       |transaction|
+|bronze     |orders                |domain          |sales      |
+|bronze     |orders                |layer           |bronze     |
+|bronze     |orders                |pii             |false      |
+|bronze     |orders                |update_frequency|daily      |
+|bronze     |products              |data_type       |master     |
+|bronze     |products              |domain          |product    |
+|bronze     |products              |layer           |bronze     |
+|bronze     |products              |pii             |false      |
+|bronze     |products              |update_frequency|daily      |
+|bronze     |region                |data_type       |reference  |
+|bronze     |region                |domain          |reference  |
+|bronze     |region                |layer           |bronze     |
+|bronze     |region                |pii             |false      |
+|bronze     |region                |update_frequency|daily      |
+|bronze     |shippers              |data_type       |master     |
+|bronze     |shippers              |domain          |logistics  |
+|bronze     |shippers              |layer           |bronze     |
+|bronze     |shippers              |pii             |false      |
+|bronze     |shippers              |update_frequency|daily      |
+|bronze     |suppliers             |data_type       |master     |
+|bronze     |suppliers             |domain          |logistics  |
+|bronze     |suppliers             |layer           |bronze     |
+|bronze     |suppliers             |pii             |false      |
+|bronze     |suppliers             |update_frequency|daily      |
+|bronze     |territories           |data_type       |reference  |
+|bronze     |territories           |domain          |reference  |
+|bronze     |territories           |layer           |bronze     |
+|bronze     |territories           |pii             |false      |
+|bronze     |territories           |update_frequency|daily      |
+|bronze     |us_states             |data_type       |reference  |
+|bronze     |us_states             |domain          |reference  |
+|bronze     |us_states             |layer           |bronze     |
+|bronze     |us_states             |pii             |false      |
+|bronze     |us_states             |update_frequency|daily      |
+|gold       |order_summary         |data_type       |aggregate  |
+|gold       |order_summary         |domain          |sales      |
+|gold       |order_summary         |layer           |gold       |
+|gold       |order_summary         |pii             |false      |
+|gold       |order_summary         |update_frequency|daily      |
+|gold       |sales_by_category     |data_type       |aggregate  |
+|gold       |sales_by_category     |domain          |sales      |
+|gold       |sales_by_category     |layer           |gold       |
+|gold       |sales_by_category     |pii             |false      |
+|gold       |sales_by_category     |update_frequency|daily      |
+|gold       |sales_by_customer     |data_type       |aggregate  |
+|gold       |sales_by_customer     |domain          |sales      |
+|gold       |sales_by_customer     |layer           |gold       |
+|gold       |sales_by_customer     |pii             |false      |
+|gold       |sales_by_customer     |update_frequency|daily      |
+|gold       |sales_by_product      |data_type       |aggregate  |
+|gold       |sales_by_product      |domain          |sales      |
+|gold       |sales_by_product      |layer           |gold       |
+|gold       |sales_by_product      |pii             |false      |
+|gold       |sales_by_product      |update_frequency|daily      |
+|ops        |dq_results            |data_type       |log        |
+|ops        |dq_results            |domain          |operations |
+|ops        |dq_results            |layer           |ops        |
+|ops        |dq_results            |pii             |false      |
+|ops        |dq_results            |update_frequency|append     |
+|ops        |ingestion_log         |data_type       |log        |
+|ops        |ingestion_log         |domain          |operations |
+|ops        |ingestion_log         |layer           |ops        |
+|ops        |ingestion_log         |pii             |false      |
+|ops        |ingestion_log         |update_frequency|append     |
+|ops        |job_runs              |data_type       |log        |
+|ops        |job_runs              |domain          |operations |
+|ops        |job_runs              |layer           |ops        |
+|ops        |job_runs              |pii             |false      |
+|ops        |job_runs              |update_frequency|append     |
+|silver     |customers             |data_type       |master     |
+|silver     |customers             |domain          |customer   |
+|silver     |customers             |layer           |silver     |
+|silver     |customers             |pii             |true       |
+|silver     |customers             |update_frequency|daily      |
+|silver     |order_details         |data_type       |transaction|
+|silver     |order_details         |domain          |sales      |
+|silver     |order_details         |layer           |silver     |
+|silver     |order_details         |pii             |false      |
+|silver     |order_details         |update_frequency|daily      |
+|silver     |orders                |data_type       |transaction|
+|silver     |orders                |domain          |sales      |
+|silver     |orders                |layer           |silver     |
+|silver     |orders                |pii             |false      |
+|silver     |orders                |update_frequency|daily      |
+|silver     |products              |data_type       |master     |
+|silver     |products              |domain          |product    |
+|silver     |products              |layer           |silver     |
+|silver     |products              |pii             |false      |
+|silver     |products              |update_frequency|daily      |
++-----------+----------------------+----------------+-----------+
+
+テーブルタグ総数: 125
+
+======================================================================
+カラムタグ一覧（PIIカラム）
+======================================================================
++-----------+----------+------------+--------+----------+
+|schema_name|table_name|column_name |tag_name|tag_value |
++-----------+----------+------------+--------+----------+
+|bronze     |customers |address     |pii     |true      |
+|bronze     |customers |address     |pii_type|address   |
+|bronze     |customers |contact_name|pii     |true      |
+|bronze     |customers |contact_name|pii_type|name      |
+|bronze     |customers |fax         |pii     |true      |
+|bronze     |customers |fax         |pii_type|phone     |
+|bronze     |customers |phone       |pii     |true      |
+|bronze     |customers |phone       |pii_type|phone     |
+|bronze     |employees |address     |pii     |true      |
+|bronze     |employees |address     |pii_type|address   |
+|bronze     |employees |birth_date  |pii     |true      |
+|bronze     |employees |birth_date  |pii_type|birth_date|
+|bronze     |employees |home_phone  |pii     |true      |
+|bronze     |employees |home_phone  |pii_type|phone     |
+|bronze     |employees |photo       |pii     |true      |
+|bronze     |employees |photo       |pii_type|photo     |
+|silver     |customers |address     |pii     |true      |
+|silver     |customers |address     |pii_type|address   |
+|silver     |customers |contact_name|pii     |true      |
+|silver     |customers |contact_name|pii_type|name      |
+|silver     |customers |fax         |pii     |true      |
+|silver     |customers |fax         |pii_type|phone     |
+|silver     |customers |phone       |pii     |true      |
+|silver     |customers |phone       |pii_type|phone     |
++-----------+----------+------------+--------+----------+
+
+カラムタグ総数: 24

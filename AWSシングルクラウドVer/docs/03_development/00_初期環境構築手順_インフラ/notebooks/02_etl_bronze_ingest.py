@@ -89,11 +89,12 @@ for table_name in source_tables:
             .withColumn("_ingest_ts", current_timestamp()) \
             .withColumn("_source_system", lit("rds_northwind"))
 
-        # Bronze層に保存（Unity Catalog管理テーブル）
+        # Bronze層に保存（当日分のみ上書き → 冪等）
         bronze_table = f"{CATALOG_NAME}.{SCHEMA_NAME}.{table_name}"
         df_with_meta.write \
             .format("delta") \
-            .mode("append") \
+            .mode("overwrite") \
+            .option("replaceWhere", f"_load_date = '{load_date}'") \
             .saveAsTable(bronze_table)
 
         row_count = df.count()
