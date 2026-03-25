@@ -61,6 +61,14 @@ Northwind database (14 tables) from [pthom/northwind_psql](https://github.com/pt
 
 RDS credentials are stored in **AWS Secrets Manager** and accessed via **Databricks Secret Scope**. Never hardcode credentials in notebooks.
 
+## Documentation Conventions
+
+When writing sprint implementation guides (`docs/01_management/sprint*/Story*.md`):
+- **Never embed code inline** (SQL, Python, YAML, etc.) — always externalize to separate files (`.sql`, `.py`) and reference by filename
+- Use Phase → Step structure with a summary table at the top
+- Write in Japanese only (no bilingual format needed)
+- Full rules: `AWSシングルクラウドVer/docs/01_management/実施手順書_作成規約.md`
+
 ## `skills/` Directory
 
 The `skills/` subdirectory contains cloned third-party Claude skill repositories (agentkits-marketing, claude-skills, Product-Manager-Skills, etc.). These are reference materials unrelated to the Databricks project.

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>注文確定 — Northwind Store</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="store-header">
+    <h1>🛒 Northwind Store</h1>
+    <nav class="store-nav">
+      <a href="catalog.html">商品一覧</a>
+      <a href="cart.html">カート <span class="cart-badge">0</span></a>
+      <a href="history.html">注文履歴</a>
+      <span id="customerName" style="color:rgba(255,255,255,0.7); font-size:13px; margin-left:8px;"></span>
+      <button id="logoutBtn" style="background:rgba(255,255,255,0.15); color:#fff; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;">ログアウト</button>
+    </nav>
+  </header>
+
+  <div style="padding:24px; max-width:800px; margin:0 auto;">
+    <h2 style="margin-bottom:20px; font-size:20px;">注文確定</h2>
+
+    <div id="cartEmpty" class="alert alert-info hidden">
+      カートが空です。<a href="catalog.html">商品一覧</a>に戻ってください。
+    </div>
+
+    <div id="orderSuccess" class="hidden">
+      <div class="alert alert-success" style="font-size:16px; padding:20px;">
+        ✅ 注文を確定しました！<br>
+        <span id="orderIdMsg" style="font-weight:700;"></span>
+      </div>
+      <div style="margin-top:16px; display:flex; gap:12px;">
+        <a href="catalog.html" class="btn btn-outline">引き続き購入する</a>
+        <a href="history.html" class="btn btn-primary">注文履歴を確認する</a>
+      </div>
+    </div>
+
+    <div id="checkoutContent">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <!-- 注文内容サマリ -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">注文内容</span></div>
+          <div id="orderSummary"></div>
+        </div>
+
+        <!-- 配送情報フォーム -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">配送先・配送業者</span></div>
+          <form id="checkoutForm">
+            <div class="form-group">
+              <label>宛名</label>
+              <input type="text" id="shipName" required>
+            </div>
+            <div class="form-group">
+              <label>住所</label>
+              <input type="text" id="shipAddress" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>市区町村</label>
+                <input type="text" id="shipCity" required>
+              </div>
+              <div class="form-group">
+                <label>地域</label>
+                <input type="text" id="shipRegion">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>郵便番号</label>
+                <input type="text" id="shipPostal">
+              </div>
+              <div class="form-group">
+                <label>国</label>
+                <input type="text" id="shipCountry" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>配送業者</label>
+              <select id="shipVia"></select>
+            </div>
+            <div id="checkoutError" class="alert alert-danger hidden"></div>
+            <div style="display:flex; gap:12px; margin-top:8px;">
+              <a href="cart.html" class="btn btn-outline">← カートに戻る</a>
+              <button type="submit" class="btn btn-primary" id="placeBtn" style="flex:1;">注文を確定する</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!api.getStoreToken()) window.location.href = '/static/store/login.html';
+    const customer = JSON.parse(localStorage.getItem('northwind_store_customer') || '{}');
+    document.getElementById('customerName').textContent = customer.company_name || '';
+    document.getElementById('logoutBtn').addEventListener('click', () => { api.clearStoreSession(); window.location.href = '/static/store/login.html'; });
+
+    async function init() {
+      const items = cart.getAll();
+      if (items.length === 0) {
+        document.getElementById('cartEmpty').classList.remove('hidden');
+        document.getElementById('checkoutContent').classList.add('hidden');
+        return;
+      }
+
+      // 注文内容サマリ
+      const summary = document.getElementById('orderSummary');
+      const total = cart.total();
+      summary.innerHTML = items.map(i => `
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #e2e8f0;">
+          <span>${i.product_name} × ${i.quantity}</span>
+          <span>$${(i.unit_price * i.quantity).toFixed(2)}</span>
+        </div>
+      `).join('') + `
+        <div style="display:flex; justify-content:space-between; padding:12px 0; font-weight:700; font-size:16px;">
+          <span>合計</span>
+          <span style="color:#2563eb;">$${total.toFixed(2)}</span>
+        </div>
+      `;
+
+      // 配送先のデフォルト値をセット
+      document.getElementById('shipName').value = customer.company_name || '';
+      document.getElementById('shipAddress').value = customer.address || '';
+      document.getElementById('shipCity').value = customer.city || '';
+      document.getElementById('shipRegion').value = customer.region || '';
+      document.getElementById('shipPostal').value = customer.postal_code || '';
+      document.getElementById('shipCountry').value = customer.country || '';
+
+      // 配送業者
+      const shippers = await api.get('/api/shippers');
+      const sel = document.getElementById('shipVia');
+      shippers.forEach(s => sel.innerHTML += `<option value="${s.shipper_id}">${s.company_name}</option>`);
+    }
+
+    document.getElementById('checkoutForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('checkoutError');
+      err.classList.add('hidden');
+      const btn = document.getElementById('placeBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> 処理中...';
+
+      try {
+        const res = await api.post('/api/orders', {
+          ship_name: document.getElementById('shipName').value,
+          ship_address: document.getElementById('shipAddress').value,
+          ship_city: document.getElementById('shipCity').value,
+          ship_region: document.getElementById('shipRegion').value || null,
+          ship_postal_code: document.getElementById('shipPostal').value || null,
+          ship_country: document.getElementById('shipCountry').value,
+          ship_via: parseInt(document.getElementById('shipVia').value),
+          items: cart.getAll().map(i => ({
+            product_id: i.product_id,
+            unit_price: i.unit_price,
+            quantity: i.quantity,
+          })),
+        });
+
+        cart.clear();
+        document.getElementById('checkoutContent').classList.add('hidden');
+        document.getElementById('orderSuccess').classList.remove('hidden');
+        document.getElementById('orderIdMsg').textContent = `注文番号: #${res.order_id}`;
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = '注文を確定する';
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

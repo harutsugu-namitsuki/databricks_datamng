@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>従業員管理 — Northwind 業務管理</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">📊 Northwind</div>
+        <div class="sidebar-user" id="userName"></div>
+      </div>
+      <nav>
+        <a href="dashboard.html">🏠 ダッシュボード</a>
+        <a href="products.html">📦 商品管理</a>
+        <a href="inventory.html">📋 在庫管理</a>
+        <a href="employees.html" class="active">👤 従業員管理</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtn" style="width:100%; color:#e2e8f0; border:1px solid rgba(255,255,255,0.2); background:transparent; padding:6px; border-radius:6px; cursor:pointer;">ログアウト</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar"><span class="page-title">従業員管理</span></div>
+      <div class="content">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <!-- 従業員一覧 -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">従業員一覧</span></div>
+            <div class="table-wrap" id="empTable">読み込み中...</div>
+          </div>
+
+          <!-- 詳細・編集フォーム -->
+          <div class="card">
+            <div class="card-header"><span class="card-title" id="detailTitle">詳細</span></div>
+            <div id="empDetail">
+              <p class="text-muted">左の一覧から従業員を選択してください</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!api.getAdminToken()) window.location.href = '/static/admin/login.html';
+    const user = JSON.parse(localStorage.getItem('northwind_admin_user') || '{}');
+    document.getElementById('userName').textContent = `${user.name} (${user.role})`;
+    document.getElementById('logoutBtn').addEventListener('click', () => { api.clearAdminSession(); window.location.href = '/static/admin/login.html'; });
+
+    const isAdmin = user.role === 'admin';
+
+    async function loadList() {
+      const employees = await api.get('/api/employees', 'admin');
+      buildTable(
+        document.getElementById('empTable'),
+        ['ID', '氏名', '役職', '入社日'],
+        employees,
+        e => `
+          <td>${e.employee_id}</td>
+          <td><button class="btn-link" onclick="loadDetail(${e.employee_id})">${e.first_name} ${e.last_name}</button></td>
+          <td>${e.title || ''}</td>
+          <td>${e.hire_date || ''}</td>
+        `
+      );
+    }
+
+    async function loadDetail(id) {
+      const e = await api.get(`/api/employees/${id}`, 'admin');
+      document.getElementById('detailTitle').textContent = `${e.first_name} ${e.last_name}`;
+
+      document.getElementById('empDetail').innerHTML = `
+        <form id="empForm">
+          <input type="hidden" id="empId" value="${e.employee_id}">
+          <div class="form-row">
+            <div class="form-group">
+              <label>名前</label>
+              <input type="text" id="eFirstName" value="${e.first_name || ''}">
+            </div>
+            <div class="form-group">
+              <label>姓</label>
+              <input type="text" id="eLastName" value="${e.last_name || ''}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>敬称</label>
+              <input type="text" id="eCourtesy" value="${e.title_of_courtesy || ''}">
+            </div>
+            <div class="form-group">
+              <label>役職</label>
+              <input type="text" id="eTitle" value="${e.title || ''}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>住所</label>
+            <input type="text" id="eAddress" value="${e.address || ''}">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>市区町村</label>
+              <input type="text" id="eCity" value="${e.city || ''}">
+            </div>
+            <div class="form-group">
+              <label>国</label>
+              <input type="text" id="eCountry" value="${e.country || ''}">
+            </div>
+          </div>
+          <hr class="divider">
+          <p class="text-muted text-sm" style="margin-bottom:12px;">個人情報 ${isAdmin ? '' : '（管理者のみ閲覧可）'}</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>生年月日</label>
+              <input type="text" value="${e.birth_date || ''}" ${isAdmin ? '' : 'disabled'}>
+            </div>
+            <div class="form-group">
+              <label>自宅電話</label>
+              <input type="text" value="${e.home_phone || ''}" ${isAdmin ? '' : 'disabled'}>
+            </div>
+          </div>
+          <div id="empSaveError" class="alert alert-danger hidden"></div>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </form>
+      `;
+
+      document.getElementById('empForm').addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const err = document.getElementById('empSaveError');
+        err.classList.add('hidden');
+        try {
+          await api.put(`/api/employees/${document.getElementById('empId').value}`, {
+            first_name: document.getElementById('eFirstName').value,
+            last_name:  document.getElementById('eLastName').value,
+            title:      document.getElementById('eTitle').value,
+            title_of_courtesy: document.getElementById('eCourtesy').value,
+            address:    document.getElementById('eAddress').value,
+            city:       document.getElementById('eCity').value,
+            country:    document.getElementById('eCountry').value,
+            postal_code: e.postal_code || '',
+          }, 'admin');
+          showToast('従業員情報を更新しました');
+          loadList();
+        } catch (ex) {
+          err.textContent = ex.message;
+          err.classList.remove('hidden');
+        }
+      });
+    }
+
+    loadList();
+  </script>
+</body>
+</html>

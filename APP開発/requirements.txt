@@ -1,0 +1,11 @@
+# Streamlit アプリ用
+streamlit>=1.30.0
+psycopg2-binary>=2.9.9
+
+# FastAPI + HTML/JS アプリ用
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.0.0
+
+# 共通
+python-dotenv>=1.0.0

@@ -5,7 +5,15 @@
       "Bash(find:*)",
       "Bash(cd /c/Users/YuenongMei*/OneDrive*/ドキュメント/GitHub/databricks_datamng)",
       "Bash(done)",
-      "mcp__context7__query-docs"
+      "mcp__context7__query-docs",
+      "WebSearch",
+      "WebFetch(domain:docs.databricks.com)",
+      "WebFetch(domain:www.databricks.com)",
+      "WebFetch(domain:www.flexera.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.chaosgenius.io)",
+      "WebFetch(domain:www.eesel.ai)",
+      "WebFetch(domain:community.databricks.com)"
     ]
   }
 }

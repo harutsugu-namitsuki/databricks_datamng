@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>注文履歴 — Northwind Store</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="store-header">
+    <h1>🛒 Northwind Store</h1>
+    <nav class="store-nav">
+      <a href="catalog.html">商品一覧</a>
+      <a href="cart.html">カート <span class="cart-badge">0</span></a>
+      <a href="history.html" class="active">注文履歴</a>
+      <span id="customerName" style="color:rgba(255,255,255,0.7); font-size:13px; margin-left:8px;"></span>
+      <button id="logoutBtn" style="background:rgba(255,255,255,0.15); color:#fff; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;">ログアウト</button>
+    </nav>
+  </header>
+
+  <div style="padding:24px; max-width:900px; margin:0 auto;">
+    <h2 style="margin-bottom:20px; font-size:20px;">注文履歴</h2>
+    <div id="orderList">読み込み中...</div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!api.getStoreToken()) window.location.href = '/static/store/login.html';
+    const customer = JSON.parse(localStorage.getItem('northwind_store_customer') || '{}');
+    document.getElementById('customerName').textContent = customer.company_name || '';
+    document.getElementById('logoutBtn').addEventListener('click', () => { api.clearStoreSession(); window.location.href = '/static/store/login.html'; });
+
+    async function load() {
+      const orders = await api.get('/api/orders');
+      const container = document.getElementById('orderList');
+
+      if (orders.length === 0) {
+        container.innerHTML = '<p class="text-muted">注文履歴がありません</p>';
+        return;
+      }
+
+      container.innerHTML = orders.map(o => `
+        <div style="margin-bottom:12px;">
+          <div class="order-header" onclick="toggleDetail(${o.order_id}, this)">
+            <div>
+              <strong>注文 #${o.order_id}</strong>
+              <span class="text-muted text-sm" style="margin-left:12px;">${o.order_date}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span class="badge ${o.shipped_date ? 'badge-success' : 'badge-warning'}">${o.shipped_date ? '出荷済' : '処理中'}</span>
+              <strong>$${Number(o.total).toFixed(2)}</strong>
+              <span style="color:#94a3b8;">▼</span>
+            </div>
+          </div>
+          <div class="order-detail hidden" id="detail_${o.order_id}">
+            <p class="text-muted text-sm" style="margin-bottom:8px;">
+              配送先: ${o.ship_name} &nbsp;|&nbsp; 配送業者: ${o.shipper_name || '—'}
+              ${o.shipped_date ? ` &nbsp;|&nbsp; 出荷日: ${o.shipped_date}` : ''}
+            </p>
+            <div id="items_${o.order_id}">読み込み中...</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function toggleDetail(orderId, headerEl) {
+      const detail = document.getElementById(`detail_${orderId}`);
+      const arrow = headerEl.querySelector('span:last-child');
+      const isHidden = detail.classList.contains('hidden');
+
+      detail.classList.toggle('hidden', !isHidden);
+      arrow.textContent = isHidden ? '▲' : '▼';
+
+      if (isHidden) {
+        const items = await api.get(`/api/orders/${orderId}/details`);
+        const itemsEl = document.getElementById(`items_${orderId}`);
+        itemsEl.innerHTML = `
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead><tr>
+              <th style="text-align:left; padding:6px 8px; border-bottom:1px solid #e2e8f0; color:#64748b;">商品名</th>
+              <th style="text-align:right; padding:6px 8px; border-bottom:1px solid #e2e8f0; color:#64748b;">単価</th>
+              <th style="text-align:right; padding:6px 8px; border-bottom:1px solid #e2e8f0; color:#64748b;">数量</th>
+              <th style="text-align:right; padding:6px 8px; border-bottom:1px solid #e2e8f0; color:#64748b;">小計</th>
+            </tr></thead>
+            <tbody>
+              ${items.map(i => `
+                <tr>
+                  <td style="padding:6px 8px;">${i.product_name}</td>
+                  <td style="padding:6px 8px; text-align:right;">$${Number(i.unit_price).toFixed(2)}</td>
+                  <td style="padding:6px 8px; text-align:right;">${i.quantity}</td>
+                  <td style="padding:6px 8px; text-align:right; font-weight:600;">$${Number(i.subtotal).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

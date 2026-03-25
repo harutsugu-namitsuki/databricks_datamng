@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>商品一覧 — Northwind Store</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <!-- ストアヘッダー -->
+  <header class="store-header">
+    <h1>🛒 Northwind Store</h1>
+    <nav class="store-nav">
+      <a href="catalog.html" class="active">商品一覧</a>
+      <a href="cart.html">カート <span class="cart-badge">0</span></a>
+      <a href="history.html">注文履歴</a>
+      <span id="customerName" style="color:rgba(255,255,255,0.7); font-size:13px; margin-left:8px;"></span>
+      <button id="logoutBtn" style="background:rgba(255,255,255,0.15); color:#fff; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;">ログアウト</button>
+    </nav>
+  </header>
+
+  <div style="padding:24px;">
+    <!-- フィルタ -->
+    <div style="display:flex; gap:12px; margin-bottom:20px; align-items:flex-end; flex-wrap:wrap;">
+      <div>
+        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px; color:#64748b;">カテゴリ</label>
+        <select id="filterCat" style="padding:8px 12px; border:1px solid #e2e8f0; border-radius:6px; min-width:160px;">
+          <option value="">全て</option>
+        </select>
+      </div>
+      <div style="flex:1; min-width:200px;">
+        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px; color:#64748b;">検索</label>
+        <input type="text" id="searchInput" placeholder="商品名で検索...">
+      </div>
+      <button class="btn btn-outline" id="searchBtn">検索</button>
+    </div>
+
+    <!-- 商品グリッド -->
+    <div class="product-grid" id="productGrid">
+      <p class="text-muted">読み込み中...</p>
+    </div>
+  </div>
+
+  <!-- カート追加 toast -->
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!api.getStoreToken()) window.location.href = '/static/store/login.html';
+
+    const customer = JSON.parse(localStorage.getItem('northwind_store_customer') || '{}');
+    document.getElementById('customerName').textContent = customer.company_name || '';
+    document.getElementById('logoutBtn').addEventListener('click', () => { api.clearStoreSession(); window.location.href = '/static/store/login.html'; });
+
+    async function init() {
+      const categories = await api.get('/api/categories');
+      const sel = document.getElementById('filterCat');
+      categories.forEach(c => sel.innerHTML += `<option value="${c.category_name}">${c.category_name}</option>`);
+      loadProducts();
+    }
+
+    async function loadProducts() {
+      const cat = document.getElementById('filterCat').value;
+      const search = document.getElementById('searchInput').value;
+      const params = new URLSearchParams();
+      if (cat) params.set('category', cat);
+      if (search) params.set('search', search);
+
+      const products = await api.get(`/api/products?${params}`);
+      const grid = document.getElementById('productGrid');
+      const active = products.filter(p => !p.discontinued);
+
+      if (active.length === 0) {
+        grid.innerHTML = '<p class="text-muted">該当する商品がありません</p>';
+        return;
+      }
+
+      grid.innerHTML = active.map(p => `
+        <div class="product-card">
+          <div>
+            <div class="product-name">${p.product_name}</div>
+            <div class="product-category">${p.category_name} · ${p.supplier_name}</div>
+          </div>
+          <div class="product-price">$${Number(p.unit_price).toFixed(2)}</div>
+          <div class="product-stock">在庫: ${p.units_in_stock} / ${p.quantity_per_unit || ''}</div>
+          ${p.units_in_stock > 0 ? `
+            <div class="qty-row">
+              <input type="number" id="qty_${p.product_id}" value="1" min="1" max="${p.units_in_stock}" style="width:70px; text-align:center; padding:6px 8px; border:1px solid #e2e8f0; border-radius:6px;">
+              <button class="btn btn-primary btn-sm" style="flex:1;" onclick="addToCart(${JSON.stringify(p).replace(/"/g,'&quot;')})">カートに追加</button>
+            </div>
+          ` : '<span class="badge badge-danger">在庫切れ</span>'}
+        </div>
+      `).join('');
+    }
+
+    function addToCart(product) {
+      const qty = parseInt(document.getElementById(`qty_${product.product_id}`).value) || 1;
+      cart.add(product, qty);
+      showToast(`${product.product_name} ×${qty} をカートに追加しました`);
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', loadProducts);
+    document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadProducts(); });
+    document.getElementById('filterCat').addEventListener('change', loadProducts);
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ダッシュボード — Northwind 業務管理</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- サイドバー -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">📊 Northwind</div>
+        <div class="sidebar-user" id="userName">読み込み中...</div>
+      </div>
+      <nav>
+        <a href="dashboard.html" class="active">🏠 ダッシュボード</a>
+        <a href="products.html">📦 商品管理</a>
+        <a href="inventory.html">📋 在庫管理</a>
+        <a href="employees.html">👤 従業員管理</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="btn btn-outline btn-sm" id="logoutBtn" style="width:100%; color:#e2e8f0; border-color:rgba(255,255,255,0.2);">ログアウト</button>
+      </div>
+    </aside>
+
+    <!-- メインコンテンツ -->
+    <main class="main">
+      <div class="topbar">
+        <span class="page-title">ダッシュボード</span>
+      </div>
+      <div class="content">
+        <!-- KPI メトリクス -->
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-label">有効商品数</div>
+            <div class="metric-value" id="productCount">—</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">総注文数</div>
+            <div class="metric-value" id="orderCount">—</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">在庫アラート</div>
+            <div class="metric-value danger" id="alertCount">—</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <!-- 最近の注文 -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">最近の注文</span>
+            </div>
+            <div class="table-wrap" id="recentOrders">読み込み中...</div>
+          </div>
+
+          <!-- 在庫アラート -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">⚠ 在庫アラート</span>
+            </div>
+            <div class="table-wrap" id="alertTable">読み込み中...</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    // 未ログインなら追い返す
+    if (!api.getAdminToken()) window.location.href = '/static/admin/login.html';
+
+    const user = JSON.parse(localStorage.getItem('northwind_admin_user') || '{}');
+    document.getElementById('userName').textContent = `${user.name || ''} (${user.role || ''})`;
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      api.clearAdminSession();
+      window.location.href = '/static/admin/login.html';
+    });
+
+    async function loadDashboard() {
+      const data = await api.get('/api/dashboard', 'admin');
+
+      document.getElementById('productCount').textContent = data.product_count;
+      document.getElementById('orderCount').textContent = data.order_count;
+      document.getElementById('alertCount').textContent = data.alert_count;
+
+      // 最近の注文テーブル
+      buildTable(
+        document.getElementById('recentOrders'),
+        ['注文#', '顧客', '注文日', '合計'],
+        data.recent_orders,
+        row => `
+          <td>#${row.order_id}</td>
+          <td>${row.company_name || '—'}</td>
+          <td>${row.order_date || ''}</td>
+          <td>$${Number(row.total).toFixed(2)}</td>
+        `
+      );
+
+      // 在庫アラートテーブル
+      if (data.alerts.length === 0) {
+        document.getElementById('alertTable').innerHTML = '<p class="text-muted" style="padding:12px">アラートなし</p>';
+      } else {
+        buildTable(
+          document.getElementById('alertTable'),
+          ['商品名', '在庫', '発注点'],
+          data.alerts,
+          row => `
+            <td>${row.product_name}</td>
+            <td><span class="badge ${row.units_in_stock === 0 ? 'badge-danger' : 'badge-warning'}">${row.units_in_stock}</span></td>
+            <td>${row.reorder_level}</td>
+          `
+        );
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>商品管理 — Northwind 業務管理</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">📊 Northwind</div>
+        <div class="sidebar-user" id="userName"></div>
+      </div>
+      <nav>
+        <a href="dashboard.html">🏠 ダッシュボード</a>
+        <a href="products.html" class="active">📦 商品管理</a>
+        <a href="inventory.html">📋 在庫管理</a>
+        <a href="employees.html">👤 従業員管理</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="btn btn-sm" id="logoutBtn" style="width:100%; color:#e2e8f0; border-color:rgba(255,255,255,0.2); background:transparent; border:1px solid rgba(255,255,255,0.2);">ログアウト</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <span class="page-title">商品管理</span>
+        <button class="btn btn-primary btn-sm" id="newProductBtn">＋ 新規登録</button>
+      </div>
+      <div class="content">
+
+        <!-- 新規 / 編集フォーム (初期非表示) -->
+        <div class="card mb-6 hidden" id="formCard">
+          <div class="card-header">
+            <span class="card-title" id="formTitle">新規登録</span>
+            <button class="btn btn-outline btn-sm" id="closeFormBtn">閉じる</button>
+          </div>
+          <form id="productForm">
+            <input type="hidden" id="editId">
+            <div class="form-row">
+              <div class="form-group">
+                <label>商品名 *</label>
+                <input type="text" id="fName" required>
+              </div>
+              <div class="form-group">
+                <label>数量/単位</label>
+                <input type="text" id="fQtyPerUnit" placeholder="例: 10 boxes x 20 bags">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>カテゴリ</label>
+                <select id="fCategory"></select>
+              </div>
+              <div class="form-group">
+                <label>仕入先</label>
+                <select id="fSupplier"></select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>単価 ($)</label>
+                <input type="number" id="fPrice" step="0.01" min="0" value="0">
+              </div>
+              <div class="form-group" style="display:flex; align-items:flex-end;">
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:0; cursor:pointer;">
+                  <input type="checkbox" id="fDiscontinued" style="width:auto;">
+                  廃止済み
+                </label>
+              </div>
+            </div>
+            <div id="formError" class="alert alert-danger hidden"></div>
+            <button type="submit" class="btn btn-primary" id="saveBtn">保存</button>
+          </form>
+        </div>
+
+        <!-- フィルタ -->
+        <div class="card mb-6">
+          <div style="display:flex; gap:12px; align-items:flex-end;">
+            <div class="form-group" style="margin:0; flex:1;">
+              <label>カテゴリ</label>
+              <select id="filterCategory"><option value="">全て</option></select>
+            </div>
+            <div class="form-group" style="margin:0; flex:2;">
+              <label>検索</label>
+              <input type="text" id="filterSearch" placeholder="商品名で検索...">
+            </div>
+            <button class="btn btn-outline" id="filterBtn">検索</button>
+          </div>
+        </div>
+
+        <!-- 商品テーブル -->
+        <div class="card">
+          <div class="table-wrap" id="productTable">読み込み中...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!api.getAdminToken()) window.location.href = '/static/admin/login.html';
+    const user = JSON.parse(localStorage.getItem('northwind_admin_user') || '{}');
+    document.getElementById('userName').textContent = `${user.name} (${user.role})`;
+    document.getElementById('logoutBtn').addEventListener('click', () => { api.clearAdminSession(); window.location.href = '/static/admin/login.html'; });
+
+    let categories = [], suppliers = [];
+
+    async function init() {
+      [categories, suppliers] = await Promise.all([
+        api.get('/api/categories', 'admin'),
+        api.get('/api/suppliers', 'admin'),
+      ]);
+
+      // フィルタのカテゴリ select
+      const fcat = document.getElementById('filterCategory');
+      categories.forEach(c => fcat.innerHTML += `<option value="${c.category_name}">${c.category_name}</option>`);
+
+      // フォームの select
+      const fc = document.getElementById('fCategory');
+      categories.forEach(c => fc.innerHTML += `<option value="${c.category_id}">${c.category_name}</option>`);
+      const fs = document.getElementById('fSupplier');
+      suppliers.forEach(s => fs.innerHTML += `<option value="${s.supplier_id}">${s.company_name}</option>`);
+
+      loadProducts();
+    }
+
+    async function loadProducts() {
+      const cat = document.getElementById('filterCategory').value;
+      const search = document.getElementById('filterSearch').value;
+      const params = new URLSearchParams();
+      if (cat) params.set('category', cat);
+      if (search) params.set('search', search);
+
+      const products = await api.get(`/api/products?${params}`, 'admin');
+
+      buildTable(
+        document.getElementById('productTable'),
+        ['ID', '商品名', 'カテゴリ', '仕入先', '単価', '在庫', '廃止', '操作'],
+        products,
+        p => `
+          <td>${p.product_id}</td>
+          <td>${p.product_name}</td>
+          <td>${p.category_name}</td>
+          <td>${p.supplier_name}</td>
+          <td>$${Number(p.unit_price).toFixed(2)}</td>
+          <td>${p.units_in_stock}</td>
+          <td>${p.discontinued ? '<span class="badge badge-warning">廃止</span>' : ''}</td>
+          <td><button class="btn btn-outline btn-sm" onclick="editProduct(${JSON.stringify(p).replace(/"/g, '&quot;')})">編集</button></td>
+        `
+      );
+    }
+
+    function editProduct(p) {
+      document.getElementById('formCard').classList.remove('hidden');
+      document.getElementById('formTitle').textContent = `編集: #${p.product_id} ${p.product_name}`;
+      document.getElementById('editId').value = p.product_id;
+      document.getElementById('fName').value = p.product_name;
+      document.getElementById('fQtyPerUnit').value = p.quantity_per_unit || '';
+      document.getElementById('fCategory').value = p.category_id;
+      document.getElementById('fSupplier').value = p.supplier_id;
+      document.getElementById('fPrice').value = p.unit_price;
+      document.getElementById('fDiscontinued').checked = !!p.discontinued;
+      document.getElementById('formCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('newProductBtn').addEventListener('click', () => {
+      document.getElementById('formCard').classList.remove('hidden');
+      document.getElementById('formTitle').textContent = '新規商品登録';
+      document.getElementById('editId').value = '';
+      document.getElementById('productForm').reset();
+    });
+
+    document.getElementById('closeFormBtn').addEventListener('click', () => {
+      document.getElementById('formCard').classList.add('hidden');
+    });
+
+    document.getElementById('filterBtn').addEventListener('click', loadProducts);
+    document.getElementById('filterSearch').addEventListener('keydown', e => { if (e.key === 'Enter') loadProducts(); });
+
+    document.getElementById('productForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('formError');
+      err.classList.add('hidden');
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+
+      const body = {
+        product_name: document.getElementById('fName').value,
+        category_id: parseInt(document.getElementById('fCategory').value),
+        supplier_id: parseInt(document.getElementById('fSupplier').value),
+        unit_price: parseFloat(document.getElementById('fPrice').value),
+        quantity_per_unit: document.getElementById('fQtyPerUnit').value || null,
+        discontinued: document.getElementById('fDiscontinued').checked ? 1 : 0,
+      };
+
+      try {
+        const id = document.getElementById('editId').value;
+        if (id) {
+          await api.put(`/api/products/${id}`, body, 'admin');
+          showToast('商品を更新しました');
+        } else {
+          await api.post('/api/products', body, 'admin');
+          showToast('商品を登録しました');
+        }
+        document.getElementById('formCard').classList.add('hidden');
+        loadProducts();
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

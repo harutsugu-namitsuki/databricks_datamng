@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ログイン — Northwind Store</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <div class="login-logo">🛒 Northwind</div>
+      <div class="login-subtitle">オンラインストア</div>
+
+      <div id="error" class="alert alert-danger hidden"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label>顧客ID</label>
+          <input type="text" id="customerId" placeholder="例: ALFKI" style="text-transform:uppercase;" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>パスワード</label>
+          <input type="password" id="password" placeholder="顧客IDと同じ" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="submitBtn">ログイン</button>
+      </form>
+
+      <p class="text-muted text-sm" style="margin-top:20px; text-align:center;">
+        パスワードは顧客IDと同じです（例: ALFKI / ALFKI）
+      </p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (api.getStoreToken()) window.location.href = '/static/store/catalog.html';
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const err = document.getElementById('error');
+      err.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> ログイン中...';
+
+      try {
+        const cid = document.getElementById('customerId').value.toUpperCase();
+        const res = await api.post('/api/auth/store', {
+          customer_id: cid,
+          password: document.getElementById('password').value,
+        }, null);
+        api.setStoreToken(res.token);
+        localStorage.setItem('northwind_store_customer', JSON.stringify(res.customer));
+        window.location.href = '/static/store/catalog.html';
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'ログイン';
+      }
+    });
+  </script>
+</body>
+</html>

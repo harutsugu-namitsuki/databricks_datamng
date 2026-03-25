@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>カート — Northwind Store</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="store-header">
+    <h1>🛒 Northwind Store</h1>
+    <nav class="store-nav">
+      <a href="catalog.html">商品一覧</a>
+      <a href="cart.html" class="active">カート <span class="cart-badge">0</span></a>
+      <a href="history.html">注文履歴</a>
+      <span id="customerName" style="color:rgba(255,255,255,0.7); font-size:13px; margin-left:8px;"></span>
+      <button id="logoutBtn" style="background:rgba(255,255,255,0.15); color:#fff; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;">ログアウト</button>
+    </nav>
+  </header>
+
+  <div style="padding:24px; max-width:900px; margin:0 auto;">
+    <h2 style="margin-bottom:20px; font-size:20px;">ショッピングカート</h2>
+
+    <div id="cartEmpty" class="alert alert-info hidden">
+      カートは空です。<a href="catalog.html">商品一覧</a>から商品を追加してください。
+    </div>
+
+    <div id="cartContent">
+      <div class="card">
+        <table class="cart-table">
+          <thead>
+            <tr><th>商品名</th><th>単価</th><th>数量</th><th>小計</th><th></th></tr>
+          </thead>
+          <tbody id="cartBody"></tbody>
+        </table>
+      </div>
+
+      <div style="text-align:right; margin-top:20px;">
+        <div class="cart-total" id="cartTotal">合計: $0.00</div>
+        <div style="margin-top:16px; display:flex; gap:12px; justify-content:flex-end;">
+          <a href="catalog.html" class="btn btn-outline">← 買い物を続ける</a>
+          <a href="checkout.html" class="btn btn-primary">注文に進む →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!api.getStoreToken()) window.location.href = '/static/store/login.html';
+    const customer = JSON.parse(localStorage.getItem('northwind_store_customer') || '{}');
+    document.getElementById('customerName').textContent = customer.company_name || '';
+    document.getElementById('logoutBtn').addEventListener('click', () => { api.clearStoreSession(); window.location.href = '/static/store/login.html'; });
+
+    function render() {
+      const items = cart.getAll();
+      if (items.length === 0) {
+        document.getElementById('cartEmpty').classList.remove('hidden');
+        document.getElementById('cartContent').classList.add('hidden');
+        return;
+      }
+      document.getElementById('cartEmpty').classList.add('hidden');
+      document.getElementById('cartContent').classList.remove('hidden');
+
+      const tbody = document.getElementById('cartBody');
+      tbody.innerHTML = items.map(item => `
+        <tr>
+          <td class="cart-item-name">${item.product_name}</td>
+          <td>$${Number(item.unit_price).toFixed(2)}</td>
+          <td>
+            <input type="number" value="${item.quantity}" min="1" max="${item.max_stock}"
+              style="width:70px; padding:4px 8px; border:1px solid #e2e8f0; border-radius:4px; text-align:center;"
+              onchange="updateQty(${item.product_id}, this.value)">
+          </td>
+          <td>$${(item.unit_price * item.quantity).toFixed(2)}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="removeItem(${item.product_id})">×</button></td>
+        </tr>
+      `).join('');
+
+      document.getElementById('cartTotal').textContent = `合計: $${cart.total().toFixed(2)}`;
+    }
+
+    function updateQty(productId, qty) {
+      cart.updateQty(productId, parseInt(qty));
+      render();
+    }
+
+    function removeItem(productId) {
+      cart.remove(productId);
+      render();
+    }
+
+    render();
+  </script>
+</body>
+</html>

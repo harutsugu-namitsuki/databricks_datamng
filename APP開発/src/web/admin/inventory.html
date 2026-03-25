@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>在庫管理 — Northwind 業務管理</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">📊 Northwind</div>
+        <div class="sidebar-user" id="userName"></div>
+      </div>
+      <nav>
+        <a href="dashboard.html">🏠 ダッシュボード</a>
+        <a href="products.html">📦 商品管理</a>
+        <a href="inventory.html" class="active">📋 在庫管理</a>
+        <a href="employees.html">👤 従業員管理</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtn" style="width:100%; color:#e2e8f0; border:1px solid rgba(255,255,255,0.2); background:transparent; padding:6px; border-radius:6px; cursor:pointer;">ログアウト</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar"><span class="page-title">在庫管理</span></div>
+      <div class="content">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+          <!-- 在庫アラート -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">⚠ 在庫アラート</span>
+              <span id="alertBadge" class="badge badge-danger hidden">0</span>
+            </div>
+            <div class="table-wrap" id="alertTable"></div>
+          </div>
+
+          <!-- 在庫調整フォーム -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">在庫調整</span></div>
+            <form id="adjustForm">
+              <div class="form-group">
+                <label>商品</label>
+                <select id="adjustProduct"></select>
+              </div>
+              <div class="form-group">
+                <label>調整数量（正: 入荷 / 負: 出庫）</label>
+                <input type="number" id="adjustQty" value="0">
+              </div>
+              <div id="adjustError" class="alert alert-danger hidden"></div>
+              <button type="submit" class="btn btn-primary">調整実行</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- 全商品在庫一覧 -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">全商品在庫一覧</span></div>
+          <div class="table-wrap" id="allInventory">読み込み中...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!api.getAdminToken()) window.location.href = '/static/admin/login.html';
+    const user = JSON.parse(localStorage.getItem('northwind_admin_user') || '{}');
+    document.getElementById('userName').textContent = `${user.name} (${user.role})`;
+    document.getElementById('logoutBtn').addEventListener('click', () => { api.clearAdminSession(); window.location.href = '/static/admin/login.html'; });
+
+    let allProducts = [];
+
+    async function load() {
+      allProducts = await api.get('/api/products', 'admin');
+
+      // 在庫アラート
+      const alerts = allProducts.filter(p => !p.discontinued && p.units_in_stock <= p.reorder_level);
+      const badge = document.getElementById('alertBadge');
+      if (alerts.length > 0) {
+        badge.textContent = alerts.length;
+        badge.classList.remove('hidden');
+        buildTable(document.getElementById('alertTable'), ['商品名', '在庫', '発注点'], alerts, p => `
+          <td>${p.product_name}</td>
+          <td><span class="badge ${p.units_in_stock === 0 ? 'badge-danger' : 'badge-warning'}">${p.units_in_stock}</span></td>
+          <td>${p.reorder_level}</td>
+        `);
+      } else {
+        document.getElementById('alertTable').innerHTML = '<p class="text-muted" style="padding:12px">アラートなし ✓</p>';
+      }
+
+      // 調整 select
+      const sel = document.getElementById('adjustProduct');
+      sel.innerHTML = '';
+      allProducts.filter(p => !p.discontinued).forEach(p => {
+        sel.innerHTML += `<option value="${p.product_id}" data-stock="${p.units_in_stock}">${p.product_name} (現在: ${p.units_in_stock})</option>`;
+      });
+
+      // 全商品テーブル
+      buildTable(
+        document.getElementById('allInventory'),
+        ['ID', '商品名', 'カテゴリ', '在庫', '発注中', '発注点', '状態'],
+        allProducts,
+        p => {
+          const isAlert = !p.discontinued && p.units_in_stock <= p.reorder_level;
+          return `
+            <td>${p.product_id}</td>
+            <td>${p.product_name}</td>
+            <td>${p.category_name}</td>
+            <td>${p.units_in_stock}</td>
+            <td>${p.units_on_order}</td>
+            <td>${p.reorder_level}</td>
+            <td>${p.discontinued ? '<span class="badge badge-warning">廃止</span>' : isAlert ? '<span class="badge badge-danger">要発注</span>' : '<span class="badge badge-success">正常</span>'}</td>
+          `;
+        }
+      );
+    }
+
+    document.getElementById('adjustForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('adjustError');
+      err.classList.add('hidden');
+      const productId = parseInt(document.getElementById('adjustProduct').value);
+      const adjustment = parseInt(document.getElementById('adjustQty').value);
+
+      if (adjustment === 0) { err.textContent = '調整数量を入力してください'; err.classList.remove('hidden'); return; }
+
+      try {
+        const res = await api.post('/api/inventory/adjust', { product_id: productId, adjustment }, 'admin');
+        showToast(`在庫を更新しました → ${res.units_in_stock}`);
+        document.getElementById('adjustQty').value = 0;
+        load();
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

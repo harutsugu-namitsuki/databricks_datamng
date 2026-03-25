@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン — Northwind 業務管理</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <div class="login-logo">📊 Northwind</div>
+      <div class="login-subtitle">業務管理システム</div>
+
+      <div id="error" class="alert alert-danger hidden"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label>ユーザー名</label>
+          <input type="text" id="username" placeholder="admin" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>パスワード</label>
+          <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="submitBtn">ログイン</button>
+      </form>
+
+      <p class="text-muted text-sm" style="margin-top:20px; text-align:center;">
+        admin / admin123 &nbsp;|&nbsp; staff / staff123
+      </p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    // すでにログイン済みならダッシュボードへ
+    if (api.getAdminToken()) {
+      window.location.href = '/static/admin/dashboard.html';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const err = document.getElementById('error');
+      err.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> ログイン中...';
+
+      try {
+        const res = await api.post('/api/auth/admin', {
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value,
+        }, null);
+        api.setAdminToken(res.token);
+        localStorage.setItem('northwind_admin_user', JSON.stringify({ name: res.name, role: res.role }));
+        window.location.href = '/static/admin/dashboard.html';
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'ログイン';
+      }
+    });
+  </script>
+</body>
+</html>
