@@ -213,30 +213,33 @@ Create two Lambda functions on AWS: one to create the NAT Gateway and one to del
 > - **IAM ロール（IAM Role）**: Lambda 関数に「何をしていいか」を定義する権限証明書のようなもの。
 >   A permissions certificate defining what the Lambda function is allowed to do.
 
-### Step 2-1: Lambda 用 IAM ロールを作成する / Create IAM Role for Lambda
+### Step 2-1: Lambda 用 IAM ポリシーとロールを作成する / Create IAM Policy and Role for Lambda
 
 **目的**: Lambda 関数が NAT Gateway・Elastic IP・ルートテーブルを操作できるようにする権限を与える。
 
+> **手順の流れ / Flow:**
+> AWS Console のロール作成ウィザードでは、カスタムポリシーを途中で新規作成することができません。そのため**「ポリシー → ロール」の順**で作成します。
+>
+> In AWS Console, you cannot create a new custom policy mid-way through the role creation wizard. Therefore, create them in order: **policy first, then role**.
+
+#### Step 2-1a: ポリシーを先に作成する / Create the permissions policy first
+
 1. AWS Management Console → 検索バーに **`IAM`** と入力 → **IAM** を開く
    - Search for `IAM` and open the IAM service
-2. 左メニューから **「ロール」（Roles）** をクリックする
-   - Click **"Roles"** in the left menu
-3. **「ロールを作成」（Create role）** ボタンをクリックする
-   - Click **"Create role"**
-4. 以下を設定する / Configure as follows:
+2. 左メニューから **「ポリシー」（Policies）** をクリックする
+   - Click **"Policies"** in the left menu
+3. **「ポリシーの作成」（Create policy）** ボタンをクリックする
+   - Click **"Create policy"**
+4. **「ポリシーエディタ（Policy editor）」** セクションが表示される。デフォルトは **「ビジュアル（Visual）」** モード（ドロップダウン選択形式）になっている
+   - The **"Policy editor"** section appears. It defaults to **Visual** mode (dropdown selectors).
+5. エディタ上部の **「JSON」** ボタンをクリックして JSON 入力モードに切り替える
+   - Click the **"JSON"** button at the top of the editor to switch to JSON input mode
 
-| 設定項目 / Setting | 値 / Value | 説明 / Explanation |
-|---|---|---|
-| 信頼されたエンティティタイプ / Trusted entity type | **AWS のサービス / AWS service** | Lambda がこのロールを使えるようにする |
-| ユースケース / Use case | **Lambda** | Lambda 専用のロール |
+   > **場所の目安 / Location**: エディタの上部に「ビジュアル（Visual）」「JSON」の 2 つのボタンがある。「JSON」をクリックするとテキスト入力エリアが表示される。
+   > There are two buttons at the top of the editor: "Visual" and "JSON". Clicking "JSON" reveals a text input area.
 
-5. **「次へ」（Next）** をクリックする
-
-6. **「許可を追加」（Add permissions）** 画面で、**「ポリシーを作成」（Create policy）** をクリックする（新しいタブが開く）
-   - On the "Add permissions" screen, click **"Create policy"** (opens a new tab)
-
-7. **JSON** タブをクリックし、以下のポリシーを貼り付ける
-   - Click the **JSON** tab and paste the following policy:
+6. 既存の内容を**すべて削除**し、以下の JSON を貼り付ける
+   - **Delete all** existing content and paste the following JSON:
 
 ```json
 {
@@ -274,17 +277,44 @@ Create two Lambda functions on AWS: one to create the NAT Gateway and one to del
 }
 ```
 
+7. **「次へ」（Next）** をクリックする
+   - Click **"Next"**
 8. ポリシー名（Policy name）に **`northwind-nat-gateway-manager-policy`** と入力する
    - Enter **`northwind-nat-gateway-manager-policy`** as the policy name
 9. **「ポリシーの作成」（Create policy）** をクリックする
    - Click **"Create policy"**
-10. 元のタブに戻り、更新ボタンを押して、作成した `northwind-nat-gateway-manager-policy` を検索・選択する
-    - Return to the original tab, click refresh, search for and select `northwind-nat-gateway-manager-policy`
-11. **「次へ」（Next）** をクリックする
-12. ロール名（Role name）に **`northwind-nat-gateway-lambda-role`** と入力する
-    - Enter **`northwind-nat-gateway-lambda-role`** as the role name
-13. **「ロールを作成」（Create role）** をクリックする
-    - Click **"Create role"**
+
+#### Step 2-1b: ロールを作成し、ポリシーをアタッチする / Create the role and attach the policy
+
+1. 左メニューから **「ロール」（Roles）** をクリックする
+   - Click **"Roles"** in the left menu
+2. **「ロールを作成」（Create role）** ボタンをクリックする
+   - Click **"Create role"**
+3. 以下を設定する / Configure as follows:
+
+| 設定項目 / Setting | 値 / Value | 説明 / Explanation |
+|---|---|---|
+| 信頼されたエンティティタイプ / Trusted entity type | **AWS のサービス / AWS service** | Lambda がこのロールを使えるようにする |
+| ユースケース / Use case | **Lambda** | Lambda 専用のロール |
+
+4. **「次へ」（Next）** をクリックする
+5. **「許可を追加」（Add permissions）** 画面の検索バーに **`northwind-nat-gateway-manager-policy`** と入力して検索する
+   - On the "Add permissions" screen, search for **`northwind-nat-gateway-manager-policy`**
+6. 表示されたポリシーの**チェックボックス**にチェックを入れる
+   - Check the **checkbox** next to the policy
+7. **「次へ」（Next）** をクリックする
+   - Click **"Next"**
+8. ロール名（Role name）に **`northwind-nat-gateway-lambda-role`** と入力する
+   - Enter **`northwind-nat-gateway-lambda-role`** as the role name
+9. **「ロールを作成」（Create role）** をクリックする
+   - Click **"Create role"**
+
+> **補足: 「信頼ポリシー」と「許可ポリシー」の違い / Trust policy vs. Permissions policy:**
+> - **信頼ポリシー（Trust policy）**: 「誰がこのロールを使えるか」= Lambda がこのロールを使える。「AWS のサービス → Lambda」選択時に自動設定（JSON 不要）。
+> - **許可ポリシー（Permissions policy）**: 「このロールが何をできるか」= Step 2-1a で作成した JSON がこれ（ec2:CreateNatGateway 等）。
+>
+> - **Trust policy**: "Who can assume this role" = Lambda can use it. Auto-configured by selecting "AWS service → Lambda" (no JSON needed).
+> - **Permissions policy**: "What this role can do" = the JSON created in Step 2-1a (ec2:CreateNatGateway, etc.).
 
 ### Step 2-2: NAT Gateway 作成用 Lambda 関数を作成する / Create the NAT Gateway Creation Lambda
 

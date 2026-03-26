@@ -13,7 +13,8 @@
       "WebFetch(domain:medium.com)",
       "WebFetch(domain:www.chaosgenius.io)",
       "WebFetch(domain:www.eesel.ai)",
-      "WebFetch(domain:community.databricks.com)"
+      "WebFetch(domain:community.databricks.com)",
+      "WebFetch(domain:staskoltsov.medium.com)"
     ]
   }
 }
