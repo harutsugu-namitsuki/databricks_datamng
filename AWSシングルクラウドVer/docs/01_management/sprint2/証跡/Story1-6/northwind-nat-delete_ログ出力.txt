@@ -1,0 +1,20 @@
+START RequestId: d133fb7b-6ad7-40e3-86af-09593f81c3bb Version: $LATEST
+=== NAT Gateway 削除を開始 / Starting NAT Gateway deletion ===
+Step 1: ManagedBy=lambda-nat-manager の NAT Gateway を検索中...
+1 個の NAT Gateway を検出 / Found 1 NAT Gateway(s)
+--- NAT Gateway を処理中: nat-067b2c6dd3143680e ---
+Step 2: ルートテーブルからルートを削除中...
+ルート削除完了: 0.0.0.0/0
+Step 3: NAT Gateway を削除中: nat-067b2c6dd3143680e...
+NAT Gateway 削除リクエスト送信完了: nat-067b2c6dd3143680e
+Step 4: NAT Gateway が Deleted になるまで待機中...
+(通常1〜3分かかります / Usually takes 1-3 minutes)
+状態確認 (1/20): deleting
+状態確認 (2/20): deleting
+状態確認 (3/20): deleted
+NAT Gateway が Deleted になりました: nat-067b2c6dd3143680e
+Step 5: Elastic IP を解放中...
+Elastic IP 解放完了: eipalloc-0025a0a697fd48ccd
+=== 完了 / Done === {"statusCode": 200, "body": {"message": "NAT Gateway(s) deleted successfully", "deleted_gateways": ["nat-067b2c6dd3143680e"], "released_eips": ["eipalloc-0025a0a697fd48ccd"]}}
+END RequestId: d133fb7b-6ad7-40e3-86af-09593f81c3bb
+REPORT RequestId: d133fb7b-6ad7-40e3-86af-09593f81c3bb	Duration: 46263.82 ms	Billed Duration: 46792 ms	Memory Size: 128 MB	Max Memory Used: 99 MB	Init Duration: 527.53 ms

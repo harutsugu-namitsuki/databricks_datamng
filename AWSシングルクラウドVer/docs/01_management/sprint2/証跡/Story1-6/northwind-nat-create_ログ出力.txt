@@ -1,0 +1,8 @@
+START RequestId: be023afd-d6cd-47a0-b0f4-1a46d3836128 Version: $LATEST
+=== NAT Gateway 作成を開始 / Starting NAT Gateway creation ===
+Step 0: 既存の Lambda 管理 NAT Gateway を確認中... / Checking for existing managed NAT Gateway...
+既存の NAT Gateway を検出: nat-067b2c6dd3143680e (state=available)
+Found existing NAT Gateway: nat-067b2c6dd3143680e (state=available)
+=== 既存を再利用して完了 / Done (reused existing) === {"statusCode": 200, "body": {"message": "NAT Gateway already exists (idempotent)", "nat_gateway_id": "nat-067b2c6dd3143680e", "state": "available"}}
+END RequestId: be023afd-d6cd-47a0-b0f4-1a46d3836128
+REPORT RequestId: be023afd-d6cd-47a0-b0f4-1a46d3836128	Duration: 321.66 ms	Billed Duration: 995 ms	Memory Size: 128 MB	Max Memory Used: 100 MB	Init Duration: 672.35 ms

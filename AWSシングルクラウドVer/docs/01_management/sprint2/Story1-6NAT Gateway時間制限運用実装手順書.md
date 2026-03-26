@@ -316,6 +316,58 @@ Create two Lambda functions on AWS: one to create the NAT Gateway and one to del
 > - **Trust policy**: "Who can assume this role" = Lambda can use it. Auto-configured by selecting "AWS service → Lambda" (no JSON needed).
 > - **Permissions policy**: "What this role can do" = the JSON created in Step 2-1a (ec2:CreateNatGateway, etc.).
 
+### Step 2-1c: Lambda コードで使用する実際の ID を取得する / Get the actual resource IDs for Lambda code
+
+**目的**: CloudFormation で定義されたリソース（Public Subnet、Private Route Table）の実際の ID を取得する。
+
+> **背景 / Background:**
+> CloudFormation テンプレートにはリソースの定義がありますが、実際の ID（`subnet-0abc...`、`rtb-0abc...`）は AWS が自動生成するため、コンソールで確認する必要があります。
+
+#### 方法 1: CloudFormation の「リソース」タブから取得（最も簡単）
+
+1. AWS Management Console → 検索バーに **`CloudFormation`** と入力 → **CloudFormation** を開く
+   - Search for `CloudFormation` and open the CloudFormation service
+2. スタック一覧から **`northwind-lakehouse`** をクリックする
+   - Click on **`northwind-lakehouse`** stack
+3. **「リソース」（Resources）** タブをクリックする
+   - Click the **"Resources"** tab
+4. 以下の 2 つのリソースを探して、**「物理 ID」（Physical ID）** をコピーする:
+   - Search for the following 2 resources and copy their **"Physical ID"**:
+
+| 論理 ID / Logical ID | リソース名 / Resource Name | コピー対象 / Copy Value |
+|---|---|---|
+| `PublicSubnet` | northwind-public-subnet | **`subnet-0xxxxxxxxxx`** → `PUBLIC_SUBNET_ID` に設定 |
+| `PrivateRouteTable` | northwind-private-rt | **`rtb-0xxxxxxxxxx`** → `PRIVATE_ROUTE_TABLE_ID` に設定 |
+
+#### 方法 2: VPC コンソールから取得（確認用）
+
+**Public Subnet ID を確認:**
+1. AWS Console → **VPC** → **「サブネット」（Subnets）** をクリック
+   - Click **VPC** → **"Subnets"**
+2. `northwind-public` または `northwind-public-subnet` を検索して見つける
+   - Search for `northwind-public` or `northwind-public-subnet`
+3. **「サブネット ID」（Subnet ID）** をコピーする
+   - Copy the **"Subnet ID"**
+
+**Private Route Table ID を確認:**
+1. AWS Console → **VPC** → **「ルートテーブル」（Route tables）** をクリック
+   - Click **VPC** → **"Route tables"**
+2. `northwind-private-rt` または `northwind-private` を検索して見つける
+   - Search for `northwind-private-rt` or `northwind-private`
+3. **「ルートテーブル ID」（Route Table ID）** をコピーする
+   - Copy the **"Route Table ID"**
+
+#### コードに設定する / Set in Lambda code
+
+取得した ID を、後ほど作成する Lambda 関数コード内の以下の部分に設定します:
+
+```python
+PUBLIC_SUBNET_ID = "subnet-0xxxxxxxxxx"  # ← 上記で取得した Public Subnet ID
+PRIVATE_ROUTE_TABLE_ID = "rtb-0xxxxxxxxxx"  # ← 上記で取得した Private Route Table ID
+```
+
+---
+
 ### Step 2-2: NAT Gateway 作成用 Lambda 関数を作成する / Create the NAT Gateway Creation Lambda
 
 **目的**: EventBridge Scheduler から呼び出されて NAT Gateway を自動作成する Lambda 関数を作る。
@@ -345,8 +397,31 @@ Create two Lambda functions on AWS: one to create the NAT Gateway and one to del
       - Confirm **`lambda_function.py`** tab is selected in the file tree on the left side of the editor
    2. エディタ内の既存コード（`import json` 等のデフォルトコード）を**すべて選択して削除**する（Ctrl+A → Delete）
       - Select all existing code in the editor and delete it (Ctrl+A → Delete)
-   3. **`nb_01_nat_create_lambda.py`** の内容を**まるごとコピーして貼り付ける**
+   3. **`nb_01_nat_create_lambda.py`** の内容を**まるごとコピーして貼り付ける**※lambda_function.pyというファイル名は直さないこと
       - Copy the entire content of **`nb_01_nat_create_lambda.py`** and paste it
+   4. - Public Subnet ID、Private Route Table IDはダミーから実際の値を記入すること。
+### 方法 1: CloudFormation の Outputs / リソースから取得（最も簡単）
+1. AWS Console → **CloudFormation** → スタック **`northwind-lakehouse`** をクリック
+2. **「リソース」（Resources）** タブをクリック
+3. 以下を探して **「物理 ID」** をコピーする：
+### 方法 2: VPC コンソールから取得
+
+**Public Subnet ID:**
+1. AWS Console → **VPC** → **サブネット（Subnets）**
+2. **`northwind-public-subnet`** を探す
+3. **Subnet ID** をコピー
+
+**Private Route Table ID:**
+1. AWS Console → **VPC** → **ルートテーブル（Route tables）**
+2. **`northwind-private-rt`** を探す
+3. **Route Table ID** をコピー
+
+
+| 論理 ID（Logical ID） | 探す名前 | コピーする値（物理 ID） |
+|---|---|---|
+| **`PublicSubnet`** | `northwind-public-subnet` | `subnet-0xxxxxxxxxx` |
+| **`PrivateRouteTable`** | `northwind-private-rt` | `rtb-0xxxxxxxxxx` |
+
 
    > **重要 / IMPORTANT**: `nb_01_nat_create_lambda.py` というファイル名のままアップロードしないこと。**必ず `lambda_function.py` の中身を置き換える形で**貼り付ける。ファイル名が違うと Lambda が `lambda_function` モジュールを見つけられず `Runtime.ImportModuleError` が発生する。
    >
@@ -381,7 +456,7 @@ Step 2-2 と同様の手順で、以下の設定で作成する:
 | ランタイム / Runtime | **Python 3.12** |
 | 実行ロール / Existing role | **`northwind-nat-gateway-lambda-role`**（同じロールを使用） |
 | タイムアウト / Timeout | **10分（10 min 0 sec）** |
-| コード / Code | `lambda_function.py` の中身を削除し、**`nb_02_nat_delete_lambda.py`** の内容を貼り付ける（Step 2-2 の手順5と同様） |
+| コード / Code | `lambda_function.py` の中身を削除し、**`nb_02_nat_delete_lambda.py`** の内容を貼り付ける（Step 2-2 の手順5と同様） ※lambda_function.pyというファイル名は直さないこと|
 
 > **タイムアウトが10分の理由 / Why 10 minutes:**
 > 削除 Lambda は NAT Gateway の削除待機（最大15秒 x 20回 = 5分）+ Elastic IP の解放を行います。全体で5分を超える可能性があるため、余裕を持って **10分** に設定します。
