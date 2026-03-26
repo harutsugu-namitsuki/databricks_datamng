@@ -108,6 +108,32 @@ IAM → ロール → "northwind-workspace-role" を開く
 
 ---
 
+---
+
+## Lambda コードのよくあるミス / Common Lambda Code Mistakes
+
+### `Runtime.ImportModuleError: No module named 'lambda_function'`
+
+**原因**: Lambda のデフォルトハンドラーは `lambda_function.lambda_handler` で、ファイル名 `lambda_function.py` を期待している。コードをファイルとしてアップロードすると名前が変わり、このエラーが出る。
+
+**正しいコード貼り付け手順:**
+
+1. Lambda コンソール → 関数を開く → **「コード」タブ**
+2. エディタ左側ファイルツリーで **`lambda_function.py`** が選択されていることを確認
+3. エディタ内の既存コードを **Ctrl+A → Delete** で全消去
+4. ノートブックファイルの内容をまるごとコピーして貼り付ける
+5. **「Deploy」** をクリック
+
+> `nb_01_nat_create_lambda.py` などのノートブックファイルを**ファイルとしてアップロードしない**こと。必ず `lambda_function.py` の中身を置き換える。
+
+**既にエラーが出た場合の修正（方法 A）:**
+→ `lambda_function.py` の中身を正しく置き換えて「Deploy」
+
+**既にエラーが出た場合の修正（方法 B）:**
+→ Configuration → General configuration → **Handler** を `nb_01_nat_create_lambda.lambda_handler` に変更
+
+---
+
 ## 変更履歴 / History
 
 | 日付 | 内容 |

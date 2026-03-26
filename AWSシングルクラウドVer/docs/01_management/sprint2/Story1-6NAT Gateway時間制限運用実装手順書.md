@@ -338,8 +338,19 @@ Create two Lambda functions on AWS: one to create the NAT Gateway and one to del
 4. **「関数の作成」（Create function）** をクリックする
    - Click **"Create function"**
 
-5. コードエディタが表示される。`lambda_function.py` の内容を **`nb_01_nat_create_lambda.py`** の内容に置き換える
-   - The code editor appears. Replace the content of `lambda_function.py` with the content from **`nb_01_nat_create_lambda.py`**
+5. コードエディタが表示される。以下の手順でコードを貼り付ける:
+   - The code editor appears. Follow these steps to paste the code:
+
+   1. エディタ左側のファイルツリーで **`lambda_function.py`** タブが選択されていることを確認する
+      - Confirm **`lambda_function.py`** tab is selected in the file tree on the left side of the editor
+   2. エディタ内の既存コード（`import json` 等のデフォルトコード）を**すべて選択して削除**する（Ctrl+A → Delete）
+      - Select all existing code in the editor and delete it (Ctrl+A → Delete)
+   3. **`nb_01_nat_create_lambda.py`** の内容を**まるごとコピーして貼り付ける**
+      - Copy the entire content of **`nb_01_nat_create_lambda.py`** and paste it
+
+   > **重要 / IMPORTANT**: `nb_01_nat_create_lambda.py` というファイル名のままアップロードしないこと。**必ず `lambda_function.py` の中身を置き換える形で**貼り付ける。ファイル名が違うと Lambda が `lambda_function` モジュールを見つけられず `Runtime.ImportModuleError` が発生する。
+   >
+   > Do NOT upload `nb_01_nat_create_lambda.py` as a file. **Always paste its content into `lambda_function.py`**. If the file name differs, Lambda cannot find the `lambda_function` module and throws `Runtime.ImportModuleError`.
 
 6. **「Deploy」** ボタンをクリックしてデプロイする
    - Click the **"Deploy"** button to deploy
@@ -370,7 +381,7 @@ Step 2-2 と同様の手順で、以下の設定で作成する:
 | ランタイム / Runtime | **Python 3.12** |
 | 実行ロール / Existing role | **`northwind-nat-gateway-lambda-role`**（同じロールを使用） |
 | タイムアウト / Timeout | **10分（10 min 0 sec）** |
-| コード / Code | **`nb_02_nat_delete_lambda.py`** の内容を貼り付ける |
+| コード / Code | `lambda_function.py` の中身を削除し、**`nb_02_nat_delete_lambda.py`** の内容を貼り付ける（Step 2-2 の手順5と同様） |
 
 > **タイムアウトが10分の理由 / Why 10 minutes:**
 > 削除 Lambda は NAT Gateway の削除待機（最大15秒 x 20回 = 5分）+ Elastic IP の解放を行います。全体で5分を超える可能性があるため、余裕を持って **10分** に設定します。
