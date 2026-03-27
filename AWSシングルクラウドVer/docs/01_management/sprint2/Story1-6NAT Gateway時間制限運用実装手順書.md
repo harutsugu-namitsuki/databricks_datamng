@@ -539,50 +539,17 @@ Configure an EventBridge schedule to automatically create the NAT Gateway before
 > - **cron 式**: 「毎日何時に実行する」などのスケジュールを記述する書式。`cron(分 時 日 月 曜日 年)` の形式。
 >   A format to describe schedules like "run daily at a specific time". Format: `cron(min hour day month weekday year)`.
 
-### Step 3-1: EventBridge Scheduler 用 IAM ロールを作成する / Create IAM Role for EventBridge Scheduler
+### Step 3-1: ~~EventBridge Scheduler 用 IAM ロールを事前作成する~~ → Step 3-2 で自動作成に統合
 
-**目的**: EventBridge Scheduler が Lambda 関数を呼び出せるようにする権限を与える。
-
-1. AWS Management Console → **IAM** → **「ロール」（Roles）** を開く
-   - Open **IAM** → **"Roles"**
-2. **「ロールを作成」（Create role）** をクリックする
-   - Click **"Create role"**
-3. 以下を設定する / Configure as follows:
-
-| 設定項目 / Setting | 値 / Value | 説明 / Explanation |
-|---|---|---|
-| 信頼されたエンティティタイプ / Trusted entity type | **AWS のサービス / AWS service** | EventBridge がこのロールを使えるようにする |
-| ユースケース / Use case | 検索バーに **`EventBridge`** と入力 → **EventBridge Scheduler** を選択 | EventBridge Scheduler 専用のロール |
-
-4. **「次へ」（Next）** をクリックする
-
-5. **「許可を追加」（Add permissions）** 画面で、**「ポリシーを作成」（Create policy）** をクリックする（新しいタブが開く）
-
-6. **JSON** タブで以下を貼り付ける:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "InvokeNATCreateLambda",
-      "Effect": "Allow",
-      "Action": "lambda:InvokeFunction",
-      "Resource": "arn:aws:lambda:ap-northeast-1:*:function:northwind-nat-create"
-    }
-  ]
-}
-```
-
-7. ポリシー名に **`northwind-eventbridge-nat-policy`** と入力し、**「ポリシーの作成」（Create policy）** をクリック
-   - Enter **`northwind-eventbridge-nat-policy`** and click **"Create policy"**
-8. 元のタブに戻り、更新 → **`northwind-eventbridge-nat-policy`** を検索・選択する
-   - Return, refresh, search and select **`northwind-eventbridge-nat-policy`**
-9. **「次へ」（Next）** をクリックする
-10. ロール名に **`northwind-eventbridge-nat-role`** と入力する
-    - Enter **`northwind-eventbridge-nat-role`** as the role name
-11. **「ロールを作成」（Create role）** をクリックする
-    - Click **"Create role"**
+> **⚠️ 手順変更の理由 / Why this step was removed:**
+>
+> IAM Console でロールを手動作成する場合、「信頼されたエンティティタイプ」→「AWS のサービス」→「EventBridge」を選ぶと、**EventBridge Rules（クラシック）用のロール**が作成されてしまいます。このロールには `AmazonEventBridgeApiDestinationsServiceRolePolicy`（API Destinations 専用）が自動付与され、Lambda 呼び出し権限が含まれません。
+>
+> また、EventBridge **Scheduler** 用のロールを手動作成する場合は「カスタム信頼ポリシー」を使う必要があり、手順が複雑になります。
+>
+> **AWS 公式ドキュメントでは、スケジュール作成時にコンソールが自動でロールを生成することを推奨しています。** この方法のほうが正確な信頼ポリシー（`scheduler.amazonaws.com`）と最小権限ポリシー（`lambda:InvokeFunction` 対象 Lambda のみ）が自動設定されるため、Step 3-2 に統合します。
+>
+> When manually creating a role via IAM Console, selecting "AWS service" → "EventBridge" creates a **Classic EventBridge Rules role** (not Scheduler), which attaches `AmazonEventBridgeApiDestinationsServiceRolePolicy` — wrong for Lambda invocation. AWS recommends letting the Scheduler console auto-create the role during schedule creation, which correctly sets the `scheduler.amazonaws.com` trust principal and scoped Lambda invoke permissions.
 
 ### Step 3-2: EventBridge スケジュールを作成する / Create EventBridge Schedule
 
@@ -633,7 +600,14 @@ Configure an EventBridge schedule to automatically create the NAT Gateway before
 | リトライポリシー / Retry policy | **有効 / Enabled** | 失敗時にリトライする |
 | 最大リトライ回数 / Maximum retry attempts | **2** | 最大2回リトライ |
 | 最大イベント経過時間 / Maximum event age | **1時間 / 1 hour** | 1時間以内にリトライ |
-| 実行ロール / Execution role | **既存のロールを使用 / Use existing role** → **`northwind-eventbridge-nat-role`** | Step 3-1 で作成したロール |
+| 実行ロール / Execution role | **「このスケジュール用に新しいロールを作成」（Create new role for this schedule）** を選択 | コンソールが自動で正しい権限のロールを作成する |
+| ロール名 / Role name | **`northwind-eventbridge-nat-role`** | 自動作成されるロールの名前 |
+
+> **なぜ「新しいロールを作成」を使うのか / Why "Create new role":**
+>
+> IAM Console でロールを手動作成すると、EventBridge Scheduler 用の信頼ポリシー（`scheduler.amazonaws.com`）を自分で設定する必要があります。EventBridge Scheduler コンソールからロールを自動作成すると、対象 Lambda のみを呼び出せる最小権限ポリシーと正確な信頼ポリシーが自動設定されるため、ミスが防げます。
+>
+> Manual IAM role creation for EventBridge Scheduler requires configuring a custom trust policy for `scheduler.amazonaws.com`. Auto-creation via the Scheduler console correctly sets scoped permissions (invoke only the target Lambda) and the correct trust principal automatically.
 
 9. **「次へ」（Next）** をクリックし、確認画面で **「スケジュールを作成」（Create schedule）** をクリックする
    - Click **"Next"** and then **"Create schedule"** on the review screen
