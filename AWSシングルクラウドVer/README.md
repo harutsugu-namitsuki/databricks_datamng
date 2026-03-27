@@ -96,7 +96,7 @@ AWSシングルクラウドVer/
 │   │   │   ├── 実装手順書.md                    ← 実施順序ガイド
 │   │   │   ├── 環境構築手順書.md
 │   │   │   ├── CloudFormation更新手順_UI編.md
-│   │   │   ├── cloudformation.yaml
+│   │   │   ├── cloudformation lambda.yaml       ← (最新) Lambda含む構築テンプレート
 │   │   │   ├── Notebook仕様書.md
 │   │   │   └── notebooks/
 │   │   │       ├── 00_setup_unity_catalog.py

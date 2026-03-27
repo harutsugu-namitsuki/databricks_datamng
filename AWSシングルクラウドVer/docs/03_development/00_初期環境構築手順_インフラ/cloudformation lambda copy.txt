@@ -1,0 +1,678 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  AWSシングルクラウド構成: Northwind データレイクハウス
+  - カタログIAMロール (Unity Catalog S3アクセス用)
+  - ワークスペースIAMロール (EC2管理用クロスアカウント)
+  - S3 Bucket + バケットポリシー (Delta Lake)
+  - Customer-managed VPC + セキュリティグループ (Databricks要件準拠)
+  - S3 VPCエンドポイント
+  - RDS PostgreSQL
+  - Internet Gateway (No NAT)
+  - AWS Secrets Manager
+
+  参照: https://cloud.flect.co.jp/entry/2024/10/07/103341
+
+# ============================================
+# Parameters
+# ============================================
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: northwind
+    Description: リソース命名用の環境名
+    AllowedValues:
+      - northwind
+      - dev
+      - prod
+
+  DatabricksAccountId:
+    Type: String
+    Description: Databricks Account ID (Account Console 右上から取得)
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: VPC CIDRブロック
+
+  PublicSubnetCidr:
+    Type: String
+    Default: 10.0.0.0/24
+    Description: Public Subnet CIDRブロック (NAT Gateway用)
+
+  PrivateSubnet1Cidr:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: Private Subnet 1 CIDRブロック
+
+  PrivateSubnet2Cidr:
+    Type: String
+    Default: 10.0.2.0/24
+    Description: Private Subnet 2 CIDRブロック (異なるAZ)
+
+  DBName:
+    Type: String
+    Default: northwind
+    Description: PostgreSQL データベース名
+
+  DBUsername:
+    Type: String
+    Default: dbadmin
+    Description: PostgreSQL マスターユーザー名
+    NoEcho: true
+
+  DBPassword:
+    Type: String
+    Description: PostgreSQL マスターパスワード (8文字以上)
+    NoEcho: true
+    MinLength: 8
+
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    Description: RDS インスタンスクラス
+    AllowedValues:
+      - db.t3.micro
+      - db.t3.small
+      - db.t3.medium
+
+  S3BucketName:
+    Type: String
+    Default: lake-northwind
+    Description: S3 バケット名 (Delta Lake)
+
+# ============================================
+# Resources
+# ============================================
+Resources:
+  # ========================================
+  # VPC and Networking (Customer-managed VPC)
+  # ========================================
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-igw
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # --- Public Subnet (NAT Gateway用) ---
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PublicSubnetCidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-subnet
+
+  # --- Private Subnet 1 (Databricks Compute + RDS) ---
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-subnet-1
+
+  # --- Private Subnet 2 (異なるAZ — Databricks要件: 2つ以上のAZ) ---
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-subnet-2
+
+  # --- Route Tables ---
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-rt
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+# ---- 削除対象 1: Elastic IP (NAT Gateway 用の固定IPアドレス) ----
+# ---- Resource to remove 1: Elastic IP for NAT Gateway ----
+  # --- NAT Gateway (for Private Subnets Internet Access) ---
+  #NatGatewayEIP:
+    #Type: AWS::EC2::EIP
+    #DependsOn: InternetGatewayAttachment
+    #Properties:
+      #Domain: vpc
+      #Tags:
+        #- Key: Name
+          #Value: !Sub ${EnvironmentName}-nat-eip
+
+# ---- 削除対象 2: NAT Gateway 本体 ----
+# ---- Resource to remove 2: NAT Gateway itself ----
+  #NatGateway:
+    #Type: AWS::EC2::NatGateway
+    #Properties:
+      #AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      #SubnetId: !Ref PublicSubnet
+      #Tags:
+        #- Key: Name
+          #Value: !Sub ${EnvironmentName}-nat
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-private-rt
+
+# ---- 削除対象 3: プライベートルートの NAT Gateway 参照 ----
+# ---- Resource to remove 3: Private route referencing NAT Gateway ----
+  #DefaultPrivateRoute:
+    #Type: AWS::EC2::Route
+    #Properties:
+      #RouteTableId: !Ref PrivateRouteTable
+      #DestinationCidrBlock: 0.0.0.0/0
+      #NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # --- S3 VPC Endpoint (Gateway型 — 推奨) ---
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  # ========================================
+  # Security Groups (Databricks要件準拠)
+  # ========================================
+
+  # --- Databricks Compute用 SG ---
+  DatabricksComputeSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-dbx-compute-sg
+      GroupDescription: Security Group for Databricks Compute (Databricks required)
+      VpcId: !Ref VPC
+      # Egress: Databricks要件の個別ポート
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Databricks infrastructure, cloud data sources, libraries
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+          Description: Metastore
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: 0.0.0.0/0
+          Description: Databricks Control Plane API (Internal call)
+        - IpProtocol: tcp
+          FromPort: 8444
+          ToPort: 8444
+          CidrIp: 0.0.0.0/0
+          Description: Unity Catalog logging and streaming
+        - IpProtocol: tcp
+          FromPort: 8445
+          ToPort: 8451
+          CidrIp: 0.0.0.0/0
+          Description: Future expansion
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-dbx-compute-sg
+
+  # --- SG内 TCP Ingress ---
+  DatabricksSGTcpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabricksComputeSG
+      Description: Allow all TCP traffic within SG
+      SourceSecurityGroupId: !Ref DatabricksComputeSG
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+
+  # --- SG内 UDP Ingress ---
+  DatabricksSGUdpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabricksComputeSG
+      Description: Allow all UDP traffic within SG
+      SourceSecurityGroupId: !Ref DatabricksComputeSG
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+
+  # --- SG内 TCP/UDP Egress (内部トラフィック用) ---
+  DatabricksSGTcpEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksComputeSG
+      Description: Allow all TCP traffic within SG (Internal)
+      DestinationSecurityGroupId: !Ref DatabricksComputeSG
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+
+  DatabricksSGUdpEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DatabricksComputeSG
+      Description: Allow all UDP traffic within SG (Internal)
+      DestinationSecurityGroupId: !Ref DatabricksComputeSG
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+
+  # --- RDS用 SG ---
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-rds-sg
+      GroupDescription: Security Group for RDS (Allows Databricks Compute access only)
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref DatabricksComputeSG
+          Description: PostgreSQL access from Databricks Compute
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-rds-sg
+
+  # ========================================
+  # RDS PostgreSQL (Private Subnet)
+  # ========================================
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS PostgreSQL (Private)
+      DBSubnetGroupName: !Sub ${EnvironmentName}-db-subnet-group
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-db-subnet-group
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub ${EnvironmentName}-db
+      DBName: !Ref DBName
+      Engine: postgres
+      EngineVersion: '16.6'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: 20
+      StorageType: gp3
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+      MultiAZ: false
+      StorageEncrypted: true
+      BackupRetentionPeriod: 0
+      DeletionProtection: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-db
+
+  # ========================================
+  # S3 Bucket (Delta Lake) + バケットポリシー
+  # ========================================
+  DataLakeBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub ${S3BucketName}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-datalake
+        - Key: Purpose
+          Value: Delta Lake Storage
+
+  # バケットポリシー: Databricksアカウントへの権限付与 + unity-catalog拒否
+  DataLakeBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataLakeBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: GrantDatabricksAccess
+            Effect: Allow
+            Principal:
+              AWS: 'arn:aws:iam::414351767826:root'
+            Action:
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource:
+              - !GetAtt DataLakeBucket.Arn
+              - !Sub ${DataLakeBucket.Arn}/*
+            Condition:
+              StringEquals:
+                'aws:PrincipalTag/DatabricksAccountId': !Ref DatabricksAccountId
+          - Sid: PreventDBFSAccessToUnityCatalog
+            Effect: Deny
+            Principal:
+              AWS: 'arn:aws:iam::414351767826:root'
+            Action: 's3:*'
+            Resource: !Sub ${DataLakeBucket.Arn}/unity-catalog/*
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt DataLakeBucket.Arn
+              - !Sub ${DataLakeBucket.Arn}/*
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+  # ========================================
+  # IAM Role 1: カタログロール (Unity Catalog S3アクセス用)
+  # 信頼先: UCMasterRole + self-assume
+  # ========================================
+  DatabricksCatalogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EnvironmentName}-databricks-catalog-role
+      Description: IAM Role for Unity Catalog S3 access
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowUCMasterRoleAssumeRole
+            Effect: Allow
+            Principal:
+              AWS: 'arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL'
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref DatabricksAccountId
+          - Sid: AllowSelfAssumeRole
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'AWS:PrincipalArn': !Sub 'arn:aws:iam::${AWS::AccountId}:role/${EnvironmentName}-databricks-catalog-role'
+                'sts:ExternalId': !Ref DatabricksAccountId
+      Policies:
+        - PolicyName: !Sub ${EnvironmentName}-catalog-s3-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3BucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetLifecycleConfiguration
+                  - s3:PutLifecycleConfiguration
+                Resource:
+                  - !GetAtt DataLakeBucket.Arn
+                  - !Sub ${DataLakeBucket.Arn}/*
+              - Sid: AllowAssumeWorkspaceRole
+                Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${EnvironmentName}-databricks-catalog-role'
+              - Sid: S3PutObjectWithACL
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource:
+                  - !GetAtt DataLakeBucket.Arn
+                  - !Sub ${DataLakeBucket.Arn}/*
+                Condition:
+                  StringLike:
+                    's3:x-amz-acl': 'bucket-owner-full-control'
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-databricks-catalog-role
+
+  # ========================================
+  # IAM Role 2: ワークスペースロール (EC2管理用クロスアカウント)
+  # 信頼先: Databricksアカウント(414351767826) + EC2サービス
+  # ========================================
+  DatabricksWorkspaceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EnvironmentName}-databricks-workspace-role
+      Description: IAM Role for Databricks workspace EC2 management
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowEC2AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+          - Sid: AllowDatabricksAssumeRole
+            Effect: Allow
+            Principal:
+              AWS: 'arn:aws:iam::414351767826:root'
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref DatabricksAccountId
+      Policies:
+        - PolicyName: !Sub ${EnvironmentName}-workspace-ec2-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EC2Management
+                Effect: Allow
+                Action:
+                  - ec2:AssociateIamInstanceProfile
+                  - ec2:AttachVolume
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:CancelSpotInstanceRequests
+                  - ec2:CreateTags
+                  - ec2:CreateVolume
+                  - ec2:DeleteTags
+                  - ec2:DeleteVolume
+                  - ec2:DescribeAvailabilityZones
+                  - ec2:DescribeIamInstanceProfileAssociations
+                  - ec2:DescribeInstanceStatus
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInternetGateways
+                  - ec2:DescribeNatGateways
+                  - ec2:DescribeNetworkAcls
+                  - ec2:DescribePrefixLists
+                  - ec2:DescribeReservedInstancesOfferings
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeSpotInstanceRequests
+                  - ec2:DescribeSpotPriceHistory
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeVpcAttribute
+                  - ec2:DescribeVpcs
+                  - ec2:DetachVolume
+                  - ec2:DisassociateIamInstanceProfile
+                  - ec2:ReplaceIamInstanceProfileAssociation
+                  - ec2:RequestSpotInstances
+                  - ec2:RevokeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RunInstances
+                  - ec2:TerminateInstances
+                  - ec2:DescribeFleetHistory
+                  - ec2:ModifyFleet
+                  - ec2:DeleteFleets
+                  - ec2:DescribeFleetInstances
+                  - ec2:DescribeFleets
+                  - ec2:CreateFleet
+                  - ec2:DeleteLaunchTemplate
+                  - ec2:GetLaunchTemplateData
+                  - ec2:CreateLaunchTemplate
+                  - ec2:DescribeLaunchTemplates
+                  - ec2:DescribeLaunchTemplateVersions
+                  - ec2:ModifyLaunchTemplate
+                  - ec2:DeleteLaunchTemplateVersions
+                  - ec2:CreateLaunchTemplateVersion
+                  - ec2:AssignPrivateIpAddresses
+                  - ec2:GetSpotPlacementScores
+                Resource: '*'
+              - Sid: SpotServiceLinkedRole
+                Effect: Allow
+                Action:
+                  - iam:CreateServiceLinkedRole
+                  - iam:PutRolePolicy
+                Resource: 'arn:aws:iam::*:role/aws-service-role/spot.amazonaws.com/AWSServiceRoleForEC2Spot'
+                Condition:
+                  StringLike:
+                    'iam:AWSServiceName': spot.amazonaws.com
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-databricks-workspace-role
+
+  # ========================================
+  # AWS Secrets Manager
+  # ========================================
+  DBCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub ${EnvironmentName}/rds/credentials
+      Description: RDS PostgreSQL credentials for Northwind database
+      SecretString: !Sub |
+        {
+          "username": "${DBUsername}",
+          "password": "${DBPassword}",
+          "engine": "postgres",
+          "host": "${RDSInstance.Endpoint.Address}",
+          "port": 5432,
+          "dbname": "${DBName}"
+        }
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-db-credentials
+
+# ============================================
+# Outputs (全IDを出力 — 手動検索不要)
+# ============================================
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value: !Ref VPC
+
+  PrivateSubnet1Id:
+    Description: Private Subnet 1 ID
+    Value: !Ref PrivateSubnet1
+
+  PrivateSubnet2Id:
+    Description: Private Subnet 2 ID
+    Value: !Ref PrivateSubnet2
+
+  DatabricksComputeSGId:
+    Description: Databricks Compute Security Group ID
+    Value: !Ref DatabricksComputeSG
+
+  RDSEndpoint:
+    Description: RDS PostgreSQL Endpoint (Private)
+    Value: !GetAtt RDSInstance.Endpoint.Address
+
+  RDSConnectionString:
+    Description: JDBC Connection String for RDS
+    Value: !Sub jdbc:postgresql://${RDSInstance.Endpoint.Address}:5432/${DBName}?sslmode=require
+
+  S3BucketName:
+    Description: S3 Data Lake Bucket Name
+    Value: !Ref DataLakeBucket
+
+  S3BucketArn:
+    Description: S3 Data Lake Bucket ARN
+    Value: !GetAtt DataLakeBucket.Arn
+
+  CatalogRoleArn:
+    Description: カタログIAMロール ARN (Storage設定で使用)
+    Value: !GetAtt DatabricksCatalogRole.Arn
+
+  WorkspaceRoleArn:
+    Description: ワークスペースIAMロール ARN (Credential設定で使用)
+    Value: !GetAtt DatabricksWorkspaceRole.Arn
+
+  DBCredentialsSecretArn:
+    Description: ARN of the DB credentials secret
+    Value: !Ref DBCredentialsSecret
+
+  RDSSecurityGroupId:
+    Description: RDS Security Group ID
+    Value: !Ref RDSSecurityGroup

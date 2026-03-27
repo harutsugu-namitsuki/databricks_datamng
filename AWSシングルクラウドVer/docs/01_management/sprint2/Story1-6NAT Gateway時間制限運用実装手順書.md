@@ -781,84 +781,193 @@ bronze_ingest → silver_transform → gold_aggregate → nat_delete
 
 ---
 
-## Phase 5: 結合テスト / Integration Test
+## Phase 5: テスト計画 / Test Plan
 
 ### 目的 / Purpose
 
-EventBridge Scheduler + Lambda + Databricks Workflows の一連の流れを通しでテストし、NAT Gateway が動的に作成・削除されることを確認する。
+各要望（NAT Gateway 自動削除、RDS 定時起動停止、パイプライン結合、Serverless 分析）を段階的にテストし、全体の動作を確認する。
 
-Test the end-to-end flow of EventBridge Scheduler + Lambda + Databricks Workflows, confirming NAT Gateway is dynamically created and deleted.
+Systematically test each requirement (NAT auto-delete, RDS scheduled start/stop, pipeline integration, Serverless analysis) and verify end-to-end behavior.
 
-### Step 5-1: 事前確認 — NAT Gateway が存在しないこと / Pre-check — No NAT Gateway exists
-
-1. AWS Console → **VPC** → **NAT ゲートウェイ（NAT gateways）** を開く
-   - Open **VPC** → **NAT gateways** in AWS Console
-2. `Available` 状態の NAT Gateway が **存在しない**ことを確認する
-   - Confirm there are **no** NAT Gateways in `Available` state
-
-### Step 5-2: NAT Gateway 作成 Lambda を手動実行する / Manually invoke NAT Gateway create Lambda
-
-**目的**: EventBridge Scheduler の定期実行を待たずに、手動で NAT Gateway を作成してテストする。
-
-1. AWS Console → **Lambda** → **`northwind-nat-create`** を開く
-   - Open **Lambda** → **`northwind-nat-create`** in AWS Console
-2. **「テスト」（Test）** タブで、イベント JSON を `{}` のまま **「テスト」（Test）** をクリックする
-   - Click **"Test"** with default `{}` event JSON
-3. 実行結果が **Succeeded** で `"state": "available"` が含まれることを確認する
-   - Confirm result is **Succeeded** with `"state": "available"`
-4. **VPC** → **NAT ゲートウェイ** で NAT Gateway が **Available** になったことを確認する
-   - Confirm NAT Gateway is **Available** in VPC console
-
-### Step 5-3: Databricks Job を手動実行する / Run the Databricks Job manually
-
-1. Databricks UI → **`northwind_daily_pipeline`** を開く
-   - Open **`northwind_daily_pipeline`** in Databricks UI
-2. **「今すぐ実行」（Run now）** をクリックする
-   - Click **"Run now"**
-3. タスクの進行を監視する（全4タスクが順に実行される）:
-   - Monitor the task progress (all 4 tasks run sequentially):
-   - `bronze_ingest` → `Running` → `Succeeded`
-   - `silver_transform` → `Running` → `Succeeded`
-   - `gold_aggregate` → `Running` → `Succeeded`
-   - `nat_delete` → `Running` → `Succeeded`
-
-**スクリーンショットを取得する（全タスク Succeeded）/ Take a screenshot (all tasks Succeeded)**
-
-### Step 5-4: 事後確認 — NAT Gateway が削除されたこと / Post-check — NAT Gateway deleted
-
-1. AWS Console → **VPC** → **NAT ゲートウェイ（NAT gateways）** を開く
-   - Open **VPC** → **NAT gateways** in AWS Console
-2. 直前に作成された NAT Gateway が **Deleted** 状態になっていることを確認する
-   - Confirm the recently created NAT Gateway is in **Deleted** state
-
-**スクリーンショットを取得する / Take a screenshot**
-
-### Step 5-5: Databricks 上で確認ノートブックを実行する（任意） / Run verification notebook on Databricks (optional)
-
-`nb_03_nat_verify.py` を Databricks ノートブック上で実行し、NAT Gateway の作成→削除のライフサイクルログを確認する。
-
-Run `nb_03_nat_verify.py` on a Databricks notebook and review the NAT Gateway create→delete lifecycle log.
-
-> **注意 / Note**: `nb_03_nat_verify.py` は手動確認用のノートブックです。セル1（作成）とセル3（削除）を順に実行してライフサイクル全体を確認できます。ただし、NAT Gateway がない状態ではクラスターの起動自体ができないため、先に Step 5-2 で NAT Gateway を手動作成してから実行してください。
+> **テスト実施順序**: Phase A（個別 Lambda）→ Phase B（EventBridge スケジュール）→ Phase C（パイプライン結合）→ Phase D（Serverless）の順で進めてください。Phase D は独立して実施可能です。
 >
-> `nb_03_nat_verify.py` is a manual verification notebook. Run Cell 1 (create) and Cell 3 (delete) sequentially. Note: since cluster startup requires NAT Gateway, create one via Step 5-2 first.
+> **Test execution order**: Phase A (individual Lambda) → Phase B (EventBridge schedules) → Phase C (pipeline integration) → Phase D (Serverless). Phase D can be run independently.
 
-### Step 5-6: 失敗時の動作確認（任意） / Failure scenario test (optional)
+---
 
-**目的**: パイプラインが途中で失敗しても NAT Gateway が削除されることを確認する。
+### Phase A: 個別 Lambda テスト / Individual Lambda Tests
 
-1. Step 5-2 と同様に、Lambda を手動実行して NAT Gateway を作成する
-   - Create a NAT Gateway by manually invoking the Lambda (same as Step 5-2)
-2. `bronze_ingest` ノートブックの先頭に一時的に `raise Exception("test failure")` を追加する
-   - Temporarily add `raise Exception("test failure")` at the beginning of the `bronze_ingest` notebook
-3. Databricks Job を **「今すぐ実行」（Run now）** する
-   - Click **"Run now"**
-4. `bronze_ingest` が **Failed** になった後、`nat_delete` が **実行される**ことを確認する
-   - Confirm that after `bronze_ingest` **fails**, `nat_delete` still **runs**
-5. AWS Console で NAT Gateway が **Deleted** になっていることを確認する
-   - Confirm NAT Gateway is **Deleted** in AWS Console
-6. テスト後、`raise Exception("test failure")` を **必ず削除する**
-   - **Make sure to remove** `raise Exception("test failure")` after testing
+#### テスト 2-1: RDS 起動 Lambda が正しく動作するか / RDS start Lambda works correctly
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | RDS コンソールで `northwind-db` が **Stopped** であることを確認 | |
+| 2 | `northwind-rds-start` Lambda を手動実行 | **Succeeded** で `"starting"` が返ること |
+| 3 | RDS コンソールで状態を監視（10〜15分） | **Available** になること |
+
+#### テスト 2-2: RDS 停止 Lambda が正しく動作するか / RDS stop Lambda works correctly
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | RDS コンソールで `northwind-db` が **Available** であることを確認 | |
+| 2 | `northwind-rds-stop` Lambda を手動実行 | **Succeeded** で `"stopping"` が返ること |
+| 3 | RDS コンソールで状態を監視（数分） | **Stopped** になること |
+
+#### テスト 2-3: RDS が既に起動中/停止中の場合に安全か（冪等性） / RDS idempotency test
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | RDS が **Available** の状態で `northwind-rds-start` を実行 | **Succeeded** で `"already available"` 的なメッセージ。エラーにならないこと |
+| 2 | RDS が **Stopped** の状態で `northwind-rds-stop` を実行 | **Succeeded** で `"already stopped"` 的なメッセージ。エラーにならないこと |
+
+#### テスト 1-2: NAT が存在しない時に実行しても安全か（冪等性） / NAT delete idempotency test
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | NAT Gateway が存在しないことを確認 | VPC コンソールで Available なし |
+| 2 | `northwind-nat-delete` Lambda を手動実行 | |
+| 3 | 実行結果を確認 | **Succeeded**（緑）で `"No NAT Gateways found to delete"` が返ること。エラーにならないこと |
+
+---
+
+### Phase B: EventBridge スケジュールテスト / EventBridge Schedule Tests
+
+#### テスト 1-1: NAT Gateway 削除スケジュールが正しく動作するか / NAT delete schedule works
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | Lambda 手動実行で NAT Gateway を作成する | VPC コンソールで Available 確認 |
+| 2 | EventBridge Schedule の実行時刻を **5分後に一時変更** する（本番は 02:00 だがテスト用） | |
+| 3 | 5分待つ | |
+| 4 | VPC コンソールで NAT Gateway を確認 | **Deleted** になっていること |
+| 5 | スケジュールを 02:00 JST に戻す | |
+
+#### テスト 3-1: RDS 停止スケジュールが正しく動作するか / RDS stop schedule works
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | Lambda 手動実行で RDS を起動する | RDS コンソールで Available 確認 |
+| 2 | EventBridge Schedule の実行時刻を **5分後に一時変更** | |
+| 3 | 15分待つ（RDS 停止には数分かかるため余裕を持つ） | |
+| 4 | RDS コンソールで確認 | **Stopped** になっていること |
+| 5 | スケジュールを 02:00 JST に戻す | |
+
+---
+
+### Phase C: パイプライン結合テスト / Pipeline Integration Tests
+
+#### テスト 4-1: パイプライン全体の結合テスト（正常系） / Full pipeline integration test (normal case)
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | **事前状態を確認** | |
+| | - VPC コンソール | NAT Gateway が Available なし |
+| | - RDS コンソール | `northwind-db` が Stopped |
+| 2 | `northwind-rds-start` Lambda を手動実行 | |
+| 3 | 10〜15分待つ | RDS が Available になること |
+| 4 | `northwind-nat-create` Lambda を手動実行 | |
+| 5 | 2〜3分待つ | NAT Gateway が Available になること |
+| 6 | Databricks UI で `northwind_daily_pipeline` を **今すぐ実行** | |
+| 7 | タスクの進行を監視 | |
+| | - `bronze_ingest` | → Succeeded |
+| | - `silver_transform` | → Succeeded |
+| | - `gold_aggregate` | → Succeeded |
+| | - `cleanup`（NAT 削除 + RDS 停止） | → Succeeded |
+| 8 | **事後状態を確認** | |
+| | - VPC コンソール | NAT Gateway が **Deleted** |
+| | - RDS コンソール | `northwind-db` が **Stopping → Stopped** |
+
+**スクリーンショット取得ポイント / Screenshot checkpoints:**
+
+- 手順 1: 事前状態（NAT = なし、RDS = Stopped）
+- 手順 7: 全タスク Succeeded
+- 手順 8: 事後状態（NAT = Deleted、RDS = Stopped）
+
+#### テスト 4-2: パイプライン失敗時にも cleanup が実行されるか（異常系） / Cleanup runs even on pipeline failure
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | RDS 起動 + NAT 作成（テスト 4-1 の手順 1〜5 と同じ） | |
+| 2 | `bronze_ingest` ノートブックの先頭に `raise Exception("test failure")` を追加 | |
+| 3 | Databricks Job を **今すぐ実行** | |
+| 4 | タスクの進行を監視 | |
+| | - `bronze_ingest` | → **Failed** |
+| | - `silver_transform` | → Upstream failed（スキップ） |
+| | - `gold_aggregate` | → Upstream failed（スキップ） |
+| | - `cleanup`（Run if: All done） | → **Succeeded** ← ここが重要 |
+| 5 | 事後状態を確認 | NAT = **Deleted**、RDS = **Stopping/Stopped** |
+| 6 | **`raise Exception("test failure")` を必ず削除する** | |
+
+**スクリーンショット取得ポイント / Screenshot checkpoints:**
+
+- 手順 4: bronze = Failed、cleanup = Succeeded
+- 手順 5: 事後状態
+
+#### テスト 4-3: cleanup 内の実行順序が正しいか（RDS 停止 → NAT 削除） / Cleanup execution order verification
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | テスト 4-1 を実行する | |
+| 2 | cleanup タスクの **ログ出力** を確認する | |
+| 3 | ログの順序を確認 | 以下の順番で出力されていること |
+
+```
+期待されるログ出力 / Expected log output:
+  RDS停止 Lambda を呼び出し中...          ← 先にRDS停止 / RDS stop first
+  RDS停止リクエスト送信完了
+  NAT Gateway 削除 Lambda を呼び出し中... ← 後にNAT削除 / NAT delete second
+  NAT Gateway 削除成功
+```
+
+---
+
+### Phase D: Serverless テスト / Serverless Compute Tests
+
+#### テスト 5-1: Serverless Compute で S3 データを読めるか / Can Serverless Compute read S3 data?
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | **NAT Gateway も RDS も停止した状態** であることを確認 | |
+| 2 | Databricks UI で新しいノートブックを作成 | |
+| 3 | クラスター選択で **Serverless** を選ぶ | |
+| 4 | 以下のコードを実行: | |
+
+```python
+# S3上のGold層データを読む（NAT不要、RDS不要）
+# Read Gold layer data from S3 (no NAT, no RDS needed)
+df = spark.read.table("northwind_catalog.gold.daily_order_summary")
+display(df)
+```
+
+| 5 | 結果を確認 | データが表示されること。エラーにならないこと |
+
+**このテストが成功すれば、分析作業時に NAT Gateway も RDS も不要であることが証明されます。**
+
+**If this test succeeds, it proves that neither NAT Gateway nor RDS is needed for analytical work.**
+
+#### テスト 5-2: Serverless Compute で RDS に直接アクセスできるか（確認用） / Can Serverless access RDS directly? (exploratory)
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | NAT Gateway 停止、RDS は **起動** した状態にする | |
+| 2 | Serverless ノートブックで以下を実行: | |
+
+```python
+# RDSに直接JDBC接続を試みる / Attempt direct JDBC connection to RDS
+df = spark.read.format("jdbc") \
+    .option("url", "jdbc:postgresql://<RDSエンドポイント>:5432/northwind") \
+    .option("dbtable", "orders") \
+    .option("user", "dbadmin") \
+    .option("password", "<パスワード>") \
+    .load()
+display(df)
+```
+
+| 3 | 結果を確認 | **成功 or 失敗を記録する**。失敗した場合は Serverless → VPC 間のネットワーク設定（NCC）が必要 |
+
+> このテストは「できるかどうかの確認」です。失敗しても問題ありません。S3 のデータだけで分析できるなら、RDS 直接アクセスは不要です。
+>
+> This is an exploratory test. Failure is acceptable. If S3 data suffices for analysis, direct RDS access from Serverless is unnecessary.
 
 ---
 
@@ -890,15 +999,28 @@ Phase 2: Lambda 関数の作成 / Create Lambda functions
       → Step 2-4（作成テスト）→ Step 2-5（削除テスト）→ Step 2-6（結果確認）
         ↓
 Phase 3: EventBridge Scheduler の設定 / Configure EventBridge Scheduler
-  └── Step 3-1（IAMロール）→ Step 3-2（スケジュール作成）→ Step 3-3（Databricksスケジュール調整）
+  └── Step 3-2（スケジュール作成 + ロール自動生成）→ Step 3-3（Databricksスケジュール調整）
         ↓
 Phase 4: Databricks Workflows Job の更新 / Update Workflows Job
   └── Step 4-1（権限追加）→ Step 4-2（ノートブック配置）→ Step 4-3（タスク追加）→ Step 4-4（フロー確認）
         ↓
-Phase 5: 結合テスト / Integration test
-  └── Step 5-1（事前確認）→ Step 5-2（Lambda手動実行）→ Step 5-3（Job実行）
-      → Step 5-4（事後確認）→ Step 5-5（ノートブック確認・任意）→ Step 5-6（失敗テスト・任意）
+Phase 5: テスト / Tests
+  └── Phase A: 個別 Lambda テスト
+        テスト 2-1（RDS起動）→ 2-2（RDS停止）→ 2-3（RDS冪等性）→ 1-2（NAT削除冪等性）
+            ↓
+      Phase B: EventBridge スケジュールテスト
+        テスト 1-1（NAT 02:00削除）→ 3-1（RDS 02:00停止）
+            ↓
+      Phase C: パイプライン結合テスト
+        テスト 4-1（正常系）→ 4-2（異常系：失敗時cleanup）→ 4-3（ログ順序確認）
+            ↓
+      Phase D: Serverless テスト（独立実施可）
+        テスト 5-1（S3データ読み取り）→ 5-2（RDS直接アクセス確認）
 ```
+
+**Phase A → B → C の順番が重要です。個別テストで動作確認してから結合テストに進んでください。Phase D は独立して実施可能です。**
+
+**Phase A → B → C order matters. Validate individual components before integration. Phase D can run independently.**
 
 ---
 
@@ -908,3 +1030,5 @@ Phase 5: 結合テスト / Integration test
 |------|------|
 | 2026-03-23 | 初版作成。Sprint 2 スコープとして Story 1-6 の実装手順を策定 / Initial version. Story 1-6 implementation guide for Sprint 2 |
 | 2026-03-23 | 実現可能性評価に基づく改修: EventBridge Scheduler による NAT Gateway 事前作成方式に変更、冪等性チェック追加、Lambda タイムアウト修正、boto3 read_timeout 設定追加 / Revised based on feasibility assessment: switched to EventBridge Scheduler for NAT pre-creation, added idempotency check, fixed Lambda timeout, added boto3 read_timeout |
+| 2026-03-27 | Step 3-1 の IAM ロール手動作成を廃止し、EventBridge Scheduler コンソールによるロール自動生成に変更（IAM Console の「EventBridge」ユースケースは Classic Rules 用で Scheduler に不適合のため） / Removed manual IAM role creation in Step 3-1; replaced with auto-creation via EventBridge Scheduler console (IAM "EventBridge" use case creates Classic Rules roles, not Scheduler roles) |
+| 2026-03-27 | Phase 5 を要望別テスト計画に全面改訂（NAT 自動削除、RDS 定時起動停止、パイプライン結合、Serverless 分析の 4 フェーズ構成） / Replaced Phase 5 with comprehensive requirement-based test plan (4 phases: NAT auto-delete, RDS scheduled start/stop, pipeline integration, Serverless analysis) |
