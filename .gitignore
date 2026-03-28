@@ -1,0 +1,37 @@
+# General
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+env/
+venv/
+requirements.txt.user
+
+# AWS / Infrastructure
+.terraform/
+terraform.tfstate*
+.aws/
+credentials
+
+# Databricks
+.databricks/
+
+# Private Documents (Promotion related)
+private/
+昇進会議/
+*昇進会議*
+*昇格アピール*
+
+# IDEs
+.vscode/
+.idea/
+.agent/
+.claude/
+.gemini/
