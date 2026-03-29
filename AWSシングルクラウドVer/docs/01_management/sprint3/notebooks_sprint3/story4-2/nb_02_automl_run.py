@@ -5,9 +5,11 @@
 # COMMAND ----------
 # セル1: 学習データの読み込み
 
+import datetime
+
 CATALOG_NAME = "northwind_catalog"
 TRAINING_TABLE = f"{CATALOG_NAME}.gold.ml_training_sales"
-EXPERIMENT_NAME = f"/Users/{spark.sql('SELECT current_user()').first()[0]}/northwind_sales_automl"
+EXPERIMENT_NAME = f"northwind_sales_automl_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
 df_train = spark.table(TRAINING_TABLE)
 print(f"学習データ件数: {df_train.count()}")
@@ -24,7 +26,6 @@ summary = automl.regress(
     time_col="order_date",
     primary_metric="rmse",
     timeout_minutes=30,
-    max_trials=20,
     experiment_name=EXPERIMENT_NAME,
 )
 
@@ -34,9 +35,14 @@ summary = automl.regress(
 print("=" * 60)
 print("AutoML 実験結果サマリ")
 print("=" * 60)
-print(f"ベストモデルの RMSE : {summary.best_trial.metrics['test_rmse']:.4f}")
-print(f"ベストモデルの R²   : {summary.best_trial.metrics['test_r2_score']:.4f}")
-print(f"ベストモデルの MAE  : {summary.best_trial.metrics['test_mae']:.4f}")
+metrics = summary.best_trial.metrics
+rmse = metrics.get('val_rmse', metrics.get('test_rmse', metrics.get('val_root_mean_squared_error', 'N/A')))
+r2 = metrics.get('val_r2_score', metrics.get('test_r2_score', 'N/A'))
+mae = metrics.get('val_mae', metrics.get('test_mae', metrics.get('val_mean_absolute_error', 'N/A')))
+
+print(f"ベストモデルの RMSE : {rmse if isinstance(rmse, str) else f'{rmse:.4f}'}")
+print(f"ベストモデルの R²   : {r2 if isinstance(r2, str) else f'{r2:.4f}'}")
+print(f"ベストモデルの MAE  : {mae if isinstance(mae, str) else f'{mae:.4f}'}")
 print(f"MLflow Run ID      : {summary.best_trial.mlflow_run_id}")
 print(f"生成ノートブック    : {summary.best_trial.notebook_path}")
 print("=" * 60)

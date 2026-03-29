@@ -12,7 +12,7 @@ SELECT
         ELSE '発注済（入荷待ち）'
     END AS alert_level
 FROM northwind_catalog.silver.products p
-LEFT JOIN northwind_catalog.silver.categories c
+LEFT JOIN northwind_catalog.bronze.categories c
     ON p.category_id = c.category_id
 WHERE p.discontinued = 0
   AND p.units_in_stock <= p.reorder_level

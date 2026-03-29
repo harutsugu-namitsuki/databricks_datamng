@@ -23,7 +23,7 @@ display(df.limit(10))
 df_products = spark.table(f"{CATALOG_NAME}.silver.products").select(
     "product_id", "category_id", "unit_price"
 )
-df_categories = spark.table(f"{CATALOG_NAME}.silver.categories").select(
+df_categories = spark.table(f"{CATALOG_NAME}.bronze.categories").select(
     "category_id", "category_name"
 )
 

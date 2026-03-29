@@ -9,7 +9,7 @@ SELECT
     SUM(p.units_in_stock)                                                          AS total_stock,
     ROUND(SUM(p.units_in_stock * p.unit_price), 2)                                 AS stock_value
 FROM northwind_catalog.silver.products p
-LEFT JOIN northwind_catalog.silver.categories c
+LEFT JOIN northwind_catalog.bronze.categories c
     ON p.category_id = c.category_id
 GROUP BY c.category_name
 ORDER BY out_of_stock_count DESC, below_reorder_count DESC

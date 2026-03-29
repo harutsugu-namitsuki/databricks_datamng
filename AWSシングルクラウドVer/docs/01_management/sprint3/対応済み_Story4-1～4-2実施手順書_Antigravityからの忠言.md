@@ -45,7 +45,6 @@ summary = automl.regress(
     time_col="order_date",   # ← ★時系列分割のために追加推奨
     primary_metric="rmse",
     timeout_minutes=30,
-    max_trials=20,
 )
 ```
 
