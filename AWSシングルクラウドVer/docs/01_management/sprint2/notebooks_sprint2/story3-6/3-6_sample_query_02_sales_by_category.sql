@@ -8,6 +8,6 @@ SELECT
   SUM(od.quantity)                                                             AS total_quantity
 FROM silver.order_details AS od
 JOIN silver.products      AS p   ON od.product_id  = p.product_id
-JOIN silver.categories    AS cat ON p.category_id   = cat.category_id
+JOIN bronze.categories    AS cat ON p.category_id   = cat.category_id
 GROUP BY cat.category_name
 ORDER BY total_sales DESC;

@@ -7,7 +7,7 @@
 | 対象 Story | 3-6 |
 | Epic | Epic 3: データ可視化・分析基盤の構築 |
 | 目的 | 整備済みメタデータと Databricks AI/BI Genie を活用し、自然言語でデータに質問できるチャットスペースを構築する |
-| 前提 | Unity Catalog に Northwind テーブル（Silver 層以上）が登録済みであること。テーブル・カラムにビジネスメタデータ（コメント）を付与済みであること |
+| 前提 | 実装手順書 Phase 3〜5 完了済み（UC スキーマ・データ・ETL）。Sprint 1 Story 3-1 完了済み（テーブル・カラムへの日本語コメント付与）。Story 3-2 完了済み（タグ付与）。 |
 
 ### 使用するテーブル
 
@@ -17,9 +17,9 @@
 | `northwind_catalog.silver.orders` | Silver | 注文ヘッダ |
 | `northwind_catalog.silver.order_details` | Silver | 注文明細 |
 | `northwind_catalog.silver.products` | Silver | 商品マスタ |
-| `northwind_catalog.silver.categories` | Silver | 商品カテゴリ |
-| `northwind_catalog.silver.suppliers` | Silver | 仕入先マスタ（任意） |
-| `northwind_catalog.silver.employees` | Silver | 従業員マスタ（任意） |
+| `northwind_catalog.bronze.categories` | bronze | 商品カテゴリ |
+| `northwind_catalog.bronze.suppliers` | bronze | 仕入先マスタ（任意） |
+| `northwind_catalog.bronze.employees` | bronze | 従業員マスタ（任意） |
 
 ### 外部ファイル一覧
 
@@ -80,15 +80,15 @@ Genie Space を新規作成し、分析対象の Northwind テーブルを追加
 
 追加するテーブルの選定基準：
 
-| 優先度 | テーブル名 | 内容 | 推奨 |
-|--------|-----------|------|------|
-| 高 | `silver.customers` | 顧客マスタ | 必須 |
-| 高 | `silver.orders` | 注文ヘッダ | 必須 |
-| 高 | `silver.order_details` | 注文明細 | 必須 |
-| 高 | `silver.products` | 商品マスタ | 必須 |
-| 中 | `silver.categories` | 商品カテゴリ | 推奨 |
-| 中 | `silver.suppliers` | 仕入先マスタ | 任意 |
-| 低 | `silver.employees` | 従業員マスタ | 任意 |
+| 優先度 | テーブル名 | 層 | 内容 | 推奨 |
+|--------|-----------|-----|------|------|
+| 高 | `silver.customers` | Silver | 顧客マスタ | 必須 |
+| 高 | `silver.orders` | Silver | 注文ヘッダ | 必須 |
+| 高 | `silver.order_details` | Silver | 注文明細 | 必須 |
+| 高 | `silver.products` | Silver | 商品マスタ | 必須 |
+| 中 | `bronze.categories` | Bronze | 商品カテゴリ | 推奨 |
+| 中 | `bronze.suppliers` | Bronze | 仕入先マスタ | 任意 |
+| 低 | `bronze.employees` | Bronze | 従業員マスタ | 任意 |
 
 > ベストプラクティスとして、最初は **5 テーブル以下** に絞ることが推奨されている。Genie Space には最大 30 テーブルまで追加可能だが、少ないほど精度が向上する。
 
@@ -125,6 +125,10 @@ Genie Space を新規作成し、分析対象の Northwind テーブルを追加
 | テーブルの説明（Table Description） | Unity Catalog で付与した説明が表示される。Genie Space 用にさらに具体的に編集可能（元の UC メタデータは変更されない） |
 | カラムの説明（Column Description） | 各カラムの説明を確認し、不足があれば鉛筆アイコンで追加 |
 | 不要カラムの非表示（Hide columns） | Genie に認識させたくないカラムは目のアイコンで非表示にする |
+
+> **Bronze テーブルのメタデータカラムは非表示にすること**: `bronze.categories`、`bronze.suppliers`、`bronze.employees` には ETL が付与したメタデータカラム（`_run_id`、`_load_date`、`_ingest_ts`、`_source_system`）が含まれる。これらはビジネス質問には不要なため、すべて非表示に設定する。
+>
+> **Sprint 1 Story 3-1 の成果を引き継ぐ**: Unity Catalog に付与済みの日本語コメントは、テーブル追加時に Genie Space へ自動的に取り込まれる。ここでは内容を確認し、Genie の回答精度向上のために必要な箇所のみ追記・調整する（UC のメタデータ本体には影響しない）。
 
 Northwind 用の編集例：
 

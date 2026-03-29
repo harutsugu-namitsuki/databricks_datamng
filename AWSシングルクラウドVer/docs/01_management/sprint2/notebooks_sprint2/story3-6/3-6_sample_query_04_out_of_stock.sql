@@ -7,7 +7,7 @@ SELECT
   cat.category_name                                                            AS category_name,
   s.company_name                                                               AS supplier_name
 FROM silver.products   AS p
-JOIN silver.categories AS cat ON p.category_id  = cat.category_id
-JOIN silver.suppliers  AS s   ON p.supplier_id  = s.supplier_id
+JOIN bronze.categories AS cat ON p.category_id  = cat.category_id
+JOIN bronze.suppliers  AS s   ON p.supplier_id  = s.supplier_id
 WHERE p.units_in_stock = 0
   AND p.discontinued   = 0;
