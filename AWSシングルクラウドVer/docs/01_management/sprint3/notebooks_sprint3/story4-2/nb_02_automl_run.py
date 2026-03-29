@@ -7,7 +7,7 @@
 
 CATALOG_NAME = "northwind_catalog"
 TRAINING_TABLE = f"{CATALOG_NAME}.gold.ml_training_sales"
-EXPERIMENT_NAME = "/Users/{user}/northwind_sales_automl"
+EXPERIMENT_NAME = f"/Users/{spark.sql('SELECT current_user()').first()[0]}/northwind_sales_automl"
 
 df_train = spark.table(TRAINING_TABLE)
 print(f"学習データ件数: {df_train.count()}")
@@ -21,9 +21,11 @@ from databricks import automl
 summary = automl.regress(
     dataset=df_train,
     target_col="total_sales",
+    time_col="order_date",
     primary_metric="rmse",
     timeout_minutes=30,
     max_trials=20,
+    experiment_name=EXPERIMENT_NAME,
 )
 
 # COMMAND ----------

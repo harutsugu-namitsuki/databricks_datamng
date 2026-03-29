@@ -16,7 +16,9 @@
       "WebFetch(domain:community.databricks.com)",
       "WebFetch(domain:staskoltsov.medium.com)",
       "WebFetch(domain:github.com)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "WebFetch(domain:nlp.johnsnowlabs.com)",
+      "WebFetch(domain:databricks.aimpointdigital.com)"
     ]
   }
 }
