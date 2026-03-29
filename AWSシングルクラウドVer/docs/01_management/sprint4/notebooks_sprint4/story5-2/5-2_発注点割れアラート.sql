@@ -14,9 +14,9 @@ SELECT
         ELSE '未発注 - 要アクション'
     END AS order_status
 FROM northwind_catalog.silver.products p
-LEFT JOIN northwind_catalog.silver.categories c
+LEFT JOIN northwind_catalog.bronze.categories c
     ON p.category_id = c.category_id
-LEFT JOIN northwind_catalog.silver.suppliers s
+LEFT JOIN northwind_catalog.bronze.suppliers s
     ON p.supplier_id = s.supplier_id
 WHERE p.discontinued = 0
   AND p.units_in_stock < p.reorder_level

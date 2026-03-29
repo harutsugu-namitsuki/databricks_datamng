@@ -17,7 +17,7 @@ SELECT
         ELSE '正常'
     END AS stock_status
 FROM northwind_catalog.silver.products p
-LEFT JOIN northwind_catalog.silver.categories c
+LEFT JOIN northwind_catalog.bronze.categories c
     ON p.category_id = c.category_id
 ORDER BY
     CASE
