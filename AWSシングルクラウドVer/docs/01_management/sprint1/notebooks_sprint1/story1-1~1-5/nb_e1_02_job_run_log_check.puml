@@ -1,0 +1,59 @@
+@startuml nb_e1_02_job_run_log_check
+title Job実行ログ確認（Story 1-3〜1-5）
+start
+
+:CATALOG_NAME 定義;
+
+partition "セル1: 直近のJob実行履歴確認" {
+
+if (ops.job_runs アクセス可能?) then (はい)
+  :ops.job_runs から直近10件取得\n(job_name, status, start_time,\n end_time, run_id)\nORDER BY start_time DESC;
+  :結果を表示;
+else (例外)
+  :[WARN] アクセス不可を出力;
+endif
+
+}
+
+partition "セル2: 直近のIngestion Log確認" {
+
+:本日日付を取得;
+
+if (ops.ingestion_log アクセス可能?) then (はい)
+  :本日分の取り込み結果を取得\n(table_name, row_count,\n duration_sec, load_date, status)\nWHERE load_date = 本日;
+  :結果を表示（最大30件）;
+else (例外)
+  :[WARN] アクセス不可を出力;
+endif
+
+}
+
+partition "セル3: パイプライン成否サマリ（直近7日間）" {
+
+if (ops.job_runs アクセス可能?) then (はい)
+  :直近7日間の実行を集計\nGROUP BY run_date, job_name, status;
+  :結果を表示;
+else (例外)
+  :[WARN] を出力;
+endif
+
+}
+
+partition "セル4: Job成功率チェック" {
+
+if (ops.job_runs アクセス可能?) then (はい)
+  :直近7日間の合計実行数・\n成功数・成功率を計算;
+  :結果を出力;
+  if (成功率 >= 80%?) then (はい)
+    :[PASS] 成功率80%以上;
+  else (いいえ)
+    :[WARN] 成功率が低い\n→ Job設定・通知設定を確認;
+  endif
+else (例外)
+  :[INFO] ログ蓄積後に再確認を促す;
+endif
+
+}
+
+stop
+@enduml

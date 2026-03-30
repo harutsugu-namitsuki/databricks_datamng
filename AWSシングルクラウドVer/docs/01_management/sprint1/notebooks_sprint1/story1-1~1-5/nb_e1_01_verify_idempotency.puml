@@ -1,0 +1,87 @@
+@startuml nb_e1_01_verify_idempotency
+title 冪等性確認（修正後）
+start
+
+:カタログ名・テーブルリスト定義;
+note right
+  Bronze 14テーブル
+  Silver 4テーブル
+  Gold 4テーブル
+end note
+
+partition "セル1: 件数スナップショット取得" {
+
+:スナップショット時刻を記録;
+
+partition "Bronze層 件数取得" {
+  while (bronze_tables をループ) is (次のテーブル)
+    :COUNT(*) を取得・出力;
+  endwhile (完了)
+}
+
+partition "Silver層 件数取得" {
+  while (silver_tables をループ) is (次のテーブル)
+    if (テーブル存在?) then (はい)
+      :COUNT(*) を取得・出力;
+    else (いいえ)
+      :"(未作成)" を出力;
+    endif
+  endwhile (完了)
+}
+
+partition "Gold層 件数取得" {
+  while (gold_tables をループ) is (次のテーブル)
+    if (テーブル存在?) then (はい)
+      :COUNT(*) を取得・出力;
+    else (いいえ)
+      :"(未作成)" を出力;
+    endif
+  endwhile (完了)
+}
+
+:📋 パイプライン2回実行後に\n再実行して件数比較を促す;
+
+}
+
+partition "セル2: Bronze _load_date 別件数" {
+
+:本日日付を取得;
+while (bronze_tables をループ) is (次のテーブル)
+  :WHERE _load_date = 本日\nで COUNT(*) を取得;
+  :テーブル名・件数を出力;
+endwhile (完了)
+
+:📋 2回実行後も件数不変\n= 冪等性OK;
+
+}
+
+partition "セル3: Silver/Gold 冪等性確認" {
+
+:SILVER_PRIMARY_KEYS 定義;
+:all_pass = True;
+
+while (SILVER_PRIMARY_KEYS をループ) is (次のテーブル)
+  if (テーブルアクセス可能?) then (はい)
+    :全件数・ユニーク件数を取得;
+    :重複件数を計算;
+    if (重複 == 0?) then (はい)
+      :[PASS] 重複なし;
+    else (いいえ)
+      :[FAIL] 重複あり;
+      :all_pass = False;
+    endif
+  else (例外)
+    :[SKIP] スキップ;
+  endif
+endwhile (完了)
+
+if (all_pass?) then (True)
+  :✅ Silver層 冪等性確認OK;
+else (False)
+  :❌ 重複あり → 修正再確認;
+endif
+
+}
+
+stop
+@enduml

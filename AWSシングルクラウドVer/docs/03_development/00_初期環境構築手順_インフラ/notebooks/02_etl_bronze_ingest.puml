@@ -1,0 +1,87 @@
+@startuml 02_etl_bronze_ingest
+
+title 02. Bronze層 取り込み（AWSシングルクラウド版）
+
+start
+
+partition "初期設定" {
+
+:設定値を定義
+  CATALOG_NAME = "northwind_catalog"
+  SCHEMA_NAME = "bronze";
+
+:ジョブ実行メタデータを生成
+  - run_id (UUID)
+  - load_date (当日)
+  - ingest_ts (現在時刻);
+
+}
+
+partition "接続情報取得" {
+
+:Databricks Secrets から接続情報を取得
+  - DB_HOST, DB_USER, DB_PASSWORD;
+
+:JDBC URL / connection_properties を構築;
+
+}
+
+partition "全テーブルをBronze層に取り込み" {
+
+:取り込み対象テーブルリストを定義（全14テーブル）;
+
+:results = [] (結果リスト初期化);
+
+while (source_tables の各テーブルについて) is (次のテーブル)
+  group try-except
+    :開始時刻を記録;
+
+    :spark.read.jdbc で RDS からデータ読み込み;
+
+    :メタデータカラムを追加
+      - _run_id
+      - _load_date
+      - _ingest_ts
+      - _source_system = "rds_northwind";
+
+    :Delta形式で Bronze層に保存
+      mode = "overwrite"（冪等性確保）
+      テーブル: {CATALOG_NAME}.bronze.{table_name};
+
+    :件数・処理時間を計測;
+    :results に成功結果を追加;
+
+    detach
+
+    :results にエラー結果を追加;
+    :エラーメッセージを表示;
+  end group
+endwhile (完了)
+
+}
+
+partition "Ingestion Log 記録" {
+
+:results から log_rows を作成
+  (run_id, table_name, row_count,
+   duration_sec, load_date, status);
+
+:log_df を作成;
+
+:ops.ingestion_log に append モードで保存;
+
+}
+
+partition "取り込み結果サマリ" {
+
+:サマリを表示
+  - run_id
+  - load_date
+  - 成功テーブル数 / 全テーブル数
+  - 合計件数;
+
+}
+
+stop
+
+@enduml

@@ -1,0 +1,28 @@
+@startuml 5-2_カテゴリ別在庫サマリ
+title カテゴリ別在庫サマリ
+start
+
+fork
+  :silver.products (p)\nからデータ読み込み;
+fork again
+  :bronze.categories (c)\nからデータ読み込み;
+end fork
+
+:LEFT JOIN\np.category_id = c.category_id;
+
+:GROUP BY c.category_name;
+note right
+  集計項目:
+  COUNT(*) → product_count
+  在庫ゼロ(非廃止) → out_of_stock_count
+  発注点割れ(非廃止) → below_reorder_count
+  SUM(units_in_stock) → total_stock
+  SUM(stock × price) → stock_value
+end note
+
+:ORDER BY out_of_stock_count DESC,\n  below_reorder_count DESC;
+
+:カテゴリ別在庫サマリを出力;
+
+stop
+@enduml

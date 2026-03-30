@@ -1,0 +1,72 @@
+@startuml old_99_export_sample_to_excel
+
+title サンプルデータ CSV → Excel 統合スクリプト フロー図
+
+start
+
+partition "設定" {
+:スクリプトディレクトリを取得;
+:「サンプルデータ_*」フォルダを検索;
+
+if (サンプルデータフォルダが見つかった?) then (はい)
+  :最新のフォルダを SAMPLE_DIR に設定;
+else (いいえ)
+  :FileNotFoundError を送出;
+}
+
+  stop
+endif
+
+:レイヤー定義: bronze, silver, gold, ops;
+:出力ファイル名を生成
+  (サンプルデータ統合_*.xlsx);
+
+partition "メイン処理 (main)" {
+:サンプルデータフォルダと出力先を表示;
+:ExcelWriter を開く (openpyxl);
+
+while (LAYERS のレイヤーを順に処理?) is (あり)
+
+  :区切りシート「layer→」を作成（空）;
+  :sheet_count をインクリメント;
+
+}
+
+partition "collect_tables(layer_dir)" {
+  if (レイヤーフォルダが存在する?) then (はい)
+    :サブフォルダをソートして列挙;
+    while (サブフォルダを順に処理?) is (あり)
+      if (フォルダ内に CSV がある?) then (はい)
+        :テーブル一覧に追加;
+      else (いいえ)
+        note right: ネスト構造対応\n（例: bronze/bronze/categories/）
+        while (さらに1段深いサブフォルダを処理?) is (あり)
+          if (CSV がある?) then (はい)
+            :テーブル一覧に追加;
+          else (いいえ)
+          endif
+        endwhile (なし)
+      endif
+    endwhile (なし)
+  else (いいえ)
+    :空リストを返す;
+  endif
+
+  while (テーブルを順に処理?) is (あり)
+    :CSV を pd.read_csv で読み込み;
+    :シートに書き出し;
+    :sheet_count をインクリメント;
+    :行数をログ出力;
+  endwhile (なし)
+
+endwhile (なし)
+
+:ExcelWriter を閉じる;
+:完了メッセージを表示
+  (シート数と出力先パス);
+
+}
+
+stop
+
+@enduml

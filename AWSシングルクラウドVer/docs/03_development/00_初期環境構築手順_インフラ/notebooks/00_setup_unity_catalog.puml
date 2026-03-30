@@ -1,0 +1,83 @@
+@startuml 00_setup_unity_catalog
+
+title 00. Unity Catalog セットアップ（AWSシングルクラウド版）
+
+start
+
+:ウィジェットから設定値を取得
+  - S3_BUCKET_NAME
+  - STORAGE_CREDENTIAL_NAME
+  - CATALOG_NAME;
+
+if (S3_BUCKET_NAME が未設定 or "<" を含む?) then (yes)
+  #pink:ValueError 発生
+  「S3_BUCKET_NAME が未設定です」;
+  stop
+else (no)
+endif
+
+:設定値を表示;
+
+partition "Step 1: 前提条件チェック" {
+
+:SHOW STORAGE CREDENTIALS を実行;
+if (STORAGE_CREDENTIAL_NAME が一覧に存在する?) then (yes)
+  :Storage Credential 確認済み;
+else (no)
+  #pink:AssertionError
+  「Storage Credential が見つかりません」;
+}
+
+  stop
+endif
+
+:SHOW CATALOGS を実行;
+if (CATALOG_NAME が一覧に存在する?) then (yes)
+  :カタログ確認済み;
+else (no)
+  #pink:AssertionError
+  「カタログが見つかりません」;
+  stop
+endif
+
+:USE CATALOG でカタログ切り替え;
+:current_catalog() で切り替え結果を検証;
+
+partition "Step 2: External Location 作成" {
+
+:CREATE EXTERNAL LOCATION IF NOT EXISTS **ext_bronze**
+  URL = s3://{S3_BUCKET_NAME}/bronze/;
+
+:CREATE EXTERNAL LOCATION IF NOT EXISTS **ext_silver**
+  URL = s3://{S3_BUCKET_NAME}/silver/;
+
+:CREATE EXTERNAL LOCATION IF NOT EXISTS **ext_gold**
+  URL = s3://{S3_BUCKET_NAME}/gold/;
+
+:CREATE EXTERNAL LOCATION IF NOT EXISTS **ext_ops**
+  URL = s3://{S3_BUCKET_NAME}/ops/;
+
+:SHOW EXTERNAL LOCATIONS で確認表示;
+
+}
+
+partition "Step 3: Schema 作成" {
+
+:スキーマ定義リストを作成
+  (bronze, silver, gold, ops);
+
+while (各スキーマについて) is (次のスキーマ)
+  :CREATE SCHEMA IF NOT EXISTS
+    {CATALOG_NAME}.{schema_name}
+    MANAGED LOCATION = s3://{S3_BUCKET_NAME}/{schema_name}/;
+endwhile (完了)
+
+:SHOW SCHEMAS IN {CATALOG_NAME} で最終確認;
+
+:セットアップ完了;
+
+}
+
+stop
+
+@enduml

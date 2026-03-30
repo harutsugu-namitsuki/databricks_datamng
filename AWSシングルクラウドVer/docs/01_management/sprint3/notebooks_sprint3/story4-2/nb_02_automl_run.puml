@@ -1,0 +1,47 @@
+@startuml
+title AutoML 実験の実行\n(nb_02_automl_run)
+
+start
+
+:カタログ名・学習テーブル名を定義;
+:実験名を生成\n(タイムスタンプ付き);
+note right
+  EXPERIMENT_NAME =
+  northwind_sales_automl_YYYYMMDD_HHMMSS
+end note
+
+:ml_training_sales テーブルを読み込み;
+:学習データ件数を出力・サンプル表示;
+
+partition "AutoML 回帰実験" {
+  :automl.regress() を実行;
+  note right
+    target_col = "total_sales"
+    time_col = "order_date"
+    primary_metric = "rmse"
+    timeout_minutes = 30
+  end note
+}
+
+partition "結果サマリ表示" {
+  :ベストモデルの metrics を取得;
+
+  :RMSE を出力;
+  :R2 スコアを出力;
+  :MAE を出力;
+  :MLflow Run ID を出力;
+  :生成ノートブックパスを出力;
+}
+
+partition "次のステップ案内" {
+  :ガイダンスを表示;
+  note right
+    1. 生成ノートブックを開く
+    2. AutoML コードを確認
+    3. Feature Importance を確認
+    4. Story 4-3 でカスタマイズ
+  end note
+}
+
+stop
+@enduml

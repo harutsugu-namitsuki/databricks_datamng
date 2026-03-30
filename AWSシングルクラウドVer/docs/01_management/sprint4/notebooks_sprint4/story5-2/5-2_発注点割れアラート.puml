@@ -1,0 +1,39 @@
+@startuml 5-2_発注点割れアラート
+title 発注点割れアラート（要発注商品の詳細）
+start
+
+fork
+  :silver.products (p)\nからデータ読み込み;
+fork again
+  :bronze.categories (c)\nからデータ読み込み;
+fork again
+  :bronze.suppliers (s)\nからデータ読み込み;
+end fork
+
+:LEFT JOIN\np.category_id = c.category_id;
+:LEFT JOIN\np.supplier_id = s.supplier_id;
+
+:WHERE フィルタ;
+note right
+  条件:
+  discontinued = 0（非廃止）
+  AND units_in_stock < reorder_level
+end note
+
+:不足数量を計算\nshortage_qty =\n reorder_level - units_in_stock;
+
+:推定発注金額を計算\nestimated_order_cost =\n shortage_qty × unit_price;
+
+:CASE で発注ステータス判定;
+if (units_on_order > 0?) then (はい)
+  :order_status = '発注済';
+else (いいえ)
+  :order_status = '未発注 - 要アクション';
+endif
+
+:ORDER BY shortage_qty DESC;
+
+:発注点割れアラート一覧を出力;
+
+stop
+@enduml

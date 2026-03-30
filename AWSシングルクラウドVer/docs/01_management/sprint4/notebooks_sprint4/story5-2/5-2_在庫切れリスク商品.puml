@@ -1,0 +1,34 @@
+@startuml 5-2_在庫切れリスク商品
+title 在庫切れリスク商品
+start
+
+fork
+  :silver.products (p)\nからデータ読み込み;
+fork again
+  :bronze.categories (c)\nからデータ読み込み;
+end fork
+
+:LEFT JOIN\np.category_id = c.category_id;
+
+:WHERE フィルタ;
+note right
+  条件:
+  discontinued = 0（非廃止）
+  AND units_in_stock <= reorder_level
+end note
+
+:CASE でアラートレベル判定;
+if (units_in_stock == 0?) then (はい)
+  :alert_level = '在庫切れ';
+elseif (units_on_order == 0?) then (はい)
+  :alert_level = '要発注';
+else (いいえ)
+  :alert_level = '発注済（入荷待ち）';
+endif
+
+:ORDER BY units_in_stock ASC,\n  reorder_level DESC;
+
+:在庫切れリスク商品一覧を出力;
+
+stop
+@enduml

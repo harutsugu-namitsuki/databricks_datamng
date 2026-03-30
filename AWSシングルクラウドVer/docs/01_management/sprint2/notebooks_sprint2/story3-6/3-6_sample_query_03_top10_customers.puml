@@ -1,0 +1,52 @@
+@startuml
+title 売上上位10社の顧客\n(3-6_sample_query_03_top10_customers)
+
+start
+
+partition "データソース読み込み" {
+
+fork
+  :silver.orders (o)\n注文データ;
+fork again
+  :silver.customers (c)\n顧客データ;
+fork again
+  :silver.order_details (od)\n注文明細データ;
+end fork
+
+}
+
+partition "JOIN" {
+:orders JOIN customers\nON o.customer_id = c.customer_id;
+:結果 JOIN order_details\nON o.order_id = od.order_id;
+
+}
+
+partition "集計" {
+:GROUP BY c.company_name, c.country\n(会社名・国別に集約);
+
+}
+
+partition "計算カラム" {
+note right
+  * company_name: 会社名
+  * country: 国名
+  * total_sales: SUM(単価 x 数量 x (1 - 割引率))  ROUND 2桁
+end note
+
+}
+
+partition "ソート" {
+:ORDER BY total_sales DESC\n(売上金額の降順);
+
+}
+
+partition "件数制限" {
+:LIMIT 10\n(上位10社のみ);
+
+:結果出力;
+
+}
+
+stop
+
+@enduml

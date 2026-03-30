@@ -1,0 +1,121 @@
+@startuml 03_etl_silver_transform
+
+title 03. Silver層 変換（AWSシングルクラウド版）
+
+start
+
+partition "初期設定" {
+
+:設定値を定義
+  CATALOG_NAME = "northwind_catalog"
+  load_date = 当日;
+
+:USE CATALOG {CATALOG_NAME};
+
+}
+
+partition "Silver変換: Customers" {
+
+:bronze.customers を読み込み
+  - _load_date でフィルタ（当日分）
+  - customer_id で重複排除;
+
+:クレンジング処理
+  - company_name: trim
+  - contact_name: trim
+  - country: trim + upper
+  - city: trim
+  - region: NULL → "N/A"、それ以外はtrim
+  - postal_code: NULL → ""、それ以外はtrim;
+
+:メタデータカラムを除外
+  (_run_id, _load_date, _ingest_ts, _source_system);
+
+:silver.customers に overwrite 保存;
+
+}
+
+partition "Silver変換: Orders" {
+
+:bronze.orders を読み込み
+  - _load_date でフィルタ（当日分）
+  - order_id で重複排除;
+
+:クレンジング処理
+  - order_date: date型にキャスト
+  - required_date: date型にキャスト
+  - shipped_date: date型にキャスト
+  - freight: NULL → 0.0
+  - ship_country: trim + upper;
+
+:メタデータカラムを除外;
+
+:silver.orders に overwrite 保存;
+
+}
+
+partition "Silver変換: Order Details" {
+
+:bronze.order_details を読み込み
+  - _load_date でフィルタ（当日分）
+  - (order_id, product_id) で重複排除;
+
+:クレンジング処理
+  - unit_price: decimal(10,2) にキャスト
+  - discount: decimal(4,2) にキャスト
+  - line_total を計算
+    = unit_price * quantity * (1 - discount);
+
+:メタデータカラムを除外;
+
+:silver.order_details に overwrite 保存;
+
+}
+
+partition "Silver変換: Products" {
+
+:bronze.products を読み込み
+  - _load_date でフィルタ（当日分）
+  - product_id で重複排除;
+
+:クレンジング処理
+  - product_name: trim
+  - unit_price: decimal(10,2) にキャスト
+  - units_in_stock: NULL → 0
+  - units_on_order: NULL → 0
+  - reorder_level: NULL → 0;
+
+:メタデータカラムを除外;
+
+:silver.products に overwrite 保存;
+
+}
+
+partition "データ品質チェック (DQ Check)" {
+
+:run_id を生成 (UUID);
+
+:DQ-001: customers の company_name NULL件数チェック;
+if (null_count <= 0?) then (PASS)
+else (FAIL)
+endif
+
+:DQ-002: orders の order_id 重複チェック;
+if (dup_count <= 0?) then (PASS)
+else (FAIL)
+endif
+
+:DQ-003: order_details の unit_price >= 0 チェック;
+if (neg_price <= 0?) then (PASS)
+else (FAIL)
+endif
+
+:DQ結果を ops.dq_results に append 保存;
+
+:DQ Check 結果を表示;
+
+}
+
+stop
+
+@enduml

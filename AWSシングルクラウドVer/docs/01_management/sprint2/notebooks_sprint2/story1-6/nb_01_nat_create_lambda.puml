@@ -1,0 +1,57 @@
+@startuml
+title NAT Gateway 作成 Lambda (nb_01_nat_create_lambda)
+
+start
+
+:Lambda ハンドラー開始;
+note right: lambda_handler(event, context)
+
+:既存の Lambda 管理 NAT Gateway を検索\n(ManagedBy=lambda-nat-manager, state=available/pending);
+
+if (既存の NAT Gateway あり?) then (はい)
+  :既存の NAT Gateway ID を取得;
+
+  if (state == pending?) then (はい)
+    :Available になるまで待機\n(15秒間隔 x 最大20回);
+  else (いいえ: available)
+  endif
+
+  :既存の NAT Gateway 情報を返却\n(冪等性: 新規作成しない);
+  stop
+
+else (いいえ)
+endif
+
+partition "Step 1: Elastic IP 取得" {
+:Elastic IP を新規割り当て\n(Domain=vpc, タグ付与);
+:allocation_id を記録;
+
+}
+
+partition "Step 2: NAT Gateway 作成" {
+:NAT Gateway を Public Subnet に作成\n(SubnetId, AllocationId, タグ付与);
+:nat_gateway_id を記録;
+
+}
+
+partition "Step 3: Available 待機" {
+:NAT Gateway が Available になるまで待機\n(15秒間隔 x 最大20回 = 最大5分);
+
+}
+
+partition "Step 4: ルートテーブル更新" {
+:Private Route Table に\n0.0.0.0/0 -> NAT Gateway ルートを追加;
+
+if (RouteAlreadyExists エラー?) then (はい)
+  :既存ルートを replace_route で置き換え;
+else (いいえ)
+  :ルート追加成功;
+endif
+
+:結果を返却\n(statusCode=200, nat_gateway_id, allocation_id);
+
+}
+
+stop
+
+@enduml

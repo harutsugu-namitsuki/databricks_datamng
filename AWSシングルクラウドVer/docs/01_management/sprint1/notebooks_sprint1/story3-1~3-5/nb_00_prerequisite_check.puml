@@ -1,0 +1,30 @@
+@startuml nb_00_prerequisite_check
+title 前提条件チェック（全テーブル存在確認）
+start
+
+:CATALOG_NAME 定義\nUSE CATALOG 実行;
+
+:expected_tables 辞書を定義;
+note right
+  bronze: 14テーブル
+  silver: 4テーブル
+  gold: 4テーブル
+  ops: 3テーブル
+  合計: 25テーブル
+end note
+
+while (各スキーマをループ\n(bronze, silver, gold, ops)) is (次のスキーマ)
+  :SHOW TABLES で\n既存テーブル一覧を取得;
+  while (期待テーブルをループ) is (次のテーブル)
+    if (テーブルが存在?) then (はい)
+      :[OK] を出力;
+    else (いいえ)
+      :[MISSING] を出力;
+    endif
+  endwhile (完了)
+endwhile (全スキーマ完了)
+
+:合計テーブル数を出力;
+
+stop
+@enduml

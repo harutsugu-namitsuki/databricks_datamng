@@ -1,0 +1,63 @@
+@startuml
+title EDA - 売上分析と特徴量検討\n(nb_02_eda_sales_analysis)
+
+start
+
+:カタログ名を定義;
+:gold.sales_by_product を読み込み;
+
+partition "時系列トレンド分析" {
+  :月別売上推移（全体）を集計;
+  note right
+    monthly_sales
+    monthly_quantity
+    monthly_orders
+  end note
+  :結果を表示;
+
+  :gold.sales_by_category を読み込み;
+  :カテゴリ別売上推移を算出;
+  :結果を表示;
+}
+
+partition "商品別分析" {
+  :商品別の売上合計・数量・平均月次売上を集計;
+  :売上分布を表示;
+
+  :売上上位10商品を抽出;
+  :上位10商品の月次推移を表示;
+}
+
+partition "相関分析" {
+  :total_sales / total_quantity / order_count\nを pandas に変換;
+  :相関行列を算出・出力;
+}
+
+partition "季節性分析" {
+  :月(order_month)ごとの平均売上・合計売上を集計;
+  :結果を表示;
+}
+
+partition "顧客・地域分析" {
+  :gold.sales_by_customer を読み込み;
+  :顧客別の売上合計・注文数・平均注文額を集計;
+  :結果を表示;
+
+  :国別の売上合計・顧客数を集計;
+  :結果を表示;
+}
+
+partition "特徴量候補の決定" {
+  :EDA結論を出力;
+  note right
+    予測対象: total_sales
+    粒度: 商品 x 月
+    特徴量: product_name,
+      order_year, order_month,
+      total_quantity, order_count
+    リーケージ検討が必要
+  end note
+}
+
+stop
+@enduml

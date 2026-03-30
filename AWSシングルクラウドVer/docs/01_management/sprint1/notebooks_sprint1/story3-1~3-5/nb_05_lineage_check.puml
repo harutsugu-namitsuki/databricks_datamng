@@ -1,0 +1,47 @@
+@startuml nb_05_lineage_check
+title リネージ可視化（Story 3-5）
+start
+
+partition "Step 5-1: リネージのプログラム的確認" {
+
+if (system.access.table_lineage\nにアクセス可能?) then (はい)
+  :northwind_catalog に関する\nリネージレコードを取得\n(source, target, event_time);
+  :レコード数を出力;
+  :結果を表示（最大100件）;
+else (例外: Premium未満)
+  :[WARN] アクセス不可を出力;
+  :lineage_df = None;
+endif
+
+}
+
+partition "Step 5-2: 期待リネージパスの検証" {
+
+:expected_lineage リストを定義;
+note right
+  Bronze → Silver: 4パス
+  Silver → Gold: 12パス
+  Bronze → Gold: 1パス（categories）
+  合計: 16パス
+end note
+
+if (lineage_df が取得済み\nかつレコード > 0?) then (はい)
+  :実際のペアをSetに変換;
+  while (expected_lineage をループ) is (次のパス)
+    if (actual_pairs に存在?) then (はい)
+      :[PASS] パスを出力;
+      :found += 1;
+    else (いいえ)
+      :[MISS] パスを出力;
+      :not_found += 1;
+    endif
+  endwhile (完了)
+  :検出数 / 未検出数を出力;
+else (いいえ)
+  :[SKIP] UIで手動確認を促す;
+endif
+
+}
+
+stop
+@enduml

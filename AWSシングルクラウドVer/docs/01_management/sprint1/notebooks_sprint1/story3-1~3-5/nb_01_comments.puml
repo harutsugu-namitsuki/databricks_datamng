@@ -1,0 +1,97 @@
+@startuml nb_01_comments
+title テーブル・カラムコメント付与（Story 3-1）
+start
+
+:CATALOG_NAME 定義;
+
+partition "Step 1-2: テーブルコメント付与" {
+
+:table_comments 辞書を定義\n(全25テーブル分);
+
+while (table_comments をループ) is (次のテーブル)
+  :COMMENT ON TABLE で\nテーブルコメントを付与;
+  :[OK] を出力;
+endwhile (全テーブル完了)
+
+:テーブルコメント付与完了を出力;
+
+}
+
+partition "Step 1-3: カラムコメント — Bronze層" {
+
+:bronze_metadata_comments 定義\n(共通メタデータ4カラム);
+:bronze_column_comments 定義\n(14テーブル分の業務カラム);
+
+partition "業務カラムコメント付与" {
+  while (bronze_column_comments をループ) is (次のテーブル)
+    while (カラムをループ) is (次のカラム)
+      :ALTER COLUMN COMMENT で\nカラムコメントを付与;
+    endwhile (完了)
+    :[OK] テーブル名と件数を出力;
+  endwhile (全テーブル完了)
+}
+
+partition "メタデータカラムコメント付与" {
+  while (Bronze全14テーブルをループ) is (次のテーブル)
+    while (メタデータ4カラムをループ) is (次のカラム)
+      :ALTER COLUMN COMMENT で\nメタデータカラムコメントを付与;
+    endwhile (完了)
+  endwhile (全テーブル完了)
+}
+
+}
+
+partition "Step 1-3: カラムコメント — Silver層" {
+
+:silver_column_comments 定義\n(4テーブル);
+
+while (silver_column_comments をループ) is (次のテーブル)
+  while (カラムをループ) is (次のカラム)
+    :ALTER COLUMN COMMENT;
+  endwhile (完了)
+  :[OK] 出力;
+endwhile (完了)
+
+}
+
+partition "Step 1-3: カラムコメント — Gold層" {
+
+:gold_column_comments 定義\n(4テーブル);
+
+while (gold_column_comments をループ) is (次のテーブル)
+  while (カラムをループ) is (次のカラム)
+    :ALTER COLUMN COMMENT;
+  endwhile (完了)
+  :[OK] 出力;
+endwhile (完了)
+
+}
+
+partition "Step 1-3: カラムコメント — Ops層" {
+
+:ops_column_comments 定義\n(3テーブル);
+
+while (ops_column_comments をループ) is (次のテーブル)
+  while (カラムをループ) is (次のカラム)
+    :ALTER COLUMN COMMENT;
+  endwhile (完了)
+  :[OK] 出力;
+endwhile (完了)
+
+}
+
+partition "Step 1-4: 付与結果の確認" {
+
+while (各スキーマをループ) is (次のスキーマ)
+  :SHOW TABLES でテーブル一覧取得;
+  while (各テーブルをループ) is (次のテーブル)
+    :DESCRIBE TABLE EXTENDED で\nテーブルコメント取得・表示;
+  endwhile (完了)
+endwhile (完了)
+
+:サンプル: bronze.employees の\nDESCRIBE TABLE を表示;
+
+}
+
+stop
+@enduml

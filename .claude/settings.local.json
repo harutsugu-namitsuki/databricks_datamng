@@ -18,7 +18,16 @@
       "WebFetch(domain:github.com)",
       "Bash(gh api:*)",
       "WebFetch(domain:nlp.johnsnowlabs.com)",
-      "WebFetch(domain:databricks.aimpointdigital.com)"
+      "WebFetch(domain:databricks.aimpointdigital.com)",
+      "Bash(py --version)",
+      "Bash(where python3:*)",
+      "Bash(where python:*)",
+      "Bash(python -c \":*)",
+      "Bash(\"c:/Users/YuenongMei\\(梅月濃\\)/OneDrive -:*)",
+      "Bash(python3 -c \"print\\(''hello''\\)\")",
+      "Bash(python -c \"print\\(''hello''\\)\")",
+      "Bash(py -c \"print\\(''hello''\\)\")",
+      "Bash(py:*)"
     ]
   }
 }

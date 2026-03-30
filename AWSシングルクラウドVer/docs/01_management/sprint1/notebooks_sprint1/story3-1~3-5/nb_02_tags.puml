@@ -1,0 +1,53 @@
+@startuml nb_02_tags
+title タグ付与（Story 3-2）
+start
+
+:CATALOG_NAME 定義;
+
+partition "Step 2-1: テーブルタグ付与" {
+
+:table_tags 辞書を定義\n(全25テーブル × 5タグ);
+note right
+  タグキー:
+  domain, layer, pii,
+  update_frequency, data_type
+end note
+
+while (table_tags をループ) is (次のテーブル)
+  :ALTER TABLE SET TAGS で\n5つのタグを一括付与;
+  :[OK] テーブル名・タグ数を出力;
+endwhile (全25テーブル完了)
+
+}
+
+partition "Step 2-2: PIIカラムタグ付与" {
+
+:pii_column_tags 辞書を定義;
+note right
+  対象:
+  bronze.customers (4カラム)
+  bronze.employees (4カラム)
+  silver.customers (4カラム)
+end note
+
+while (pii_column_tags をループ) is (次のテーブル)
+  while (カラムをループ) is (次のカラム)
+    :ALTER COLUMN SET TAGS で\npii / pii_type タグを付与;
+    :[OK] 出力;
+  endwhile (完了)
+endwhile (全テーブル完了)
+
+}
+
+partition "Step 2-3: 付与結果の確認" {
+
+:system.information_schema.table_tags\nから全テーブルタグを取得・表示;
+:タグ総数を出力;
+
+:system.information_schema.column_tags\nからPIIカラムタグを取得・表示;
+:カラムタグ総数を出力;
+
+}
+
+stop
+@enduml

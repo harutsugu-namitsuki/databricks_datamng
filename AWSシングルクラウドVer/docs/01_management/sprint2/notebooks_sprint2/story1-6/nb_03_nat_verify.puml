@@ -1,0 +1,75 @@
+@startuml
+title NAT Gateway 動作確認ノートブック (nb_03_nat_verify)
+caption Databricks 上で実行
+
+start
+
+partition "セル1: NAT Gateway 作成 Lambda 呼び出し" {
+  :Lambda クライアント初期化\n(read_timeout=600秒, retries=0);
+  :northwind-nat-create Lambda を\n同期呼び出し (RequestResponse);
+  :レスポンス解析;
+
+  if (statusCode == 200?) then (はい)
+    :NAT Gateway ID を表示\n「インターネットアクセス可能」;
+  else (いいえ)
+    :例外を送出\n「NAT Gateway 作成失敗」;
+    stop
+  endif
+}
+
+partition "セル2: NAT Gateway 状態確認" {
+  :EC2 クライアント初期化;
+  :ManagedBy=lambda-nat-manager の\nNAT Gateway を検索;
+
+  if (NAT Gateway あり?) then (いいえ)
+    :「管理対象なし」を表示;
+  else (はい)
+    while (NAT Gateway を順に処理) is (あり)
+      :ID, Name, State, Subnet,\nCreateTime, PublicIP, AllocationId を表示;
+
+      switch (state)
+        case (available)
+          :「稼働中」を表示;
+        case (pending)
+          :「起動中」を表示;
+        case (deleted)
+          :「削除済み」を表示;
+        case (failed)
+          :「作成失敗」を表示;
+      endswitch
+    endwhile (なし)
+  endif
+}
+
+partition "セル3: NAT Gateway 削除 Lambda 呼び出し" {
+  :northwind-nat-delete Lambda を\n同期呼び出し (RequestResponse);
+  :レスポンス解析;
+
+  if (statusCode == 200?) then (はい)
+    :削除した NAT Gateway / 解放した EIP を表示;
+  else (いいえ)
+    :例外を送出\n「NAT Gateway 削除失敗」;
+    stop
+  endif
+}
+
+partition "セル4: インターネット接続テスト" {
+  :GitHub 上の Northwind README に\nHTTP リクエスト送信\n(timeout=10秒);
+
+  if (接続成功?) then (はい)
+    :HTTP Status, Content Length を表示\n「NAT Gateway 正常動作」;
+  else (いいえ)
+    :「接続失敗」を表示\n「NAT Gateway が未作成または未 Available」;
+  endif
+}
+
+partition "セル5: コスト見積もり確認" {
+  :NAT Gateway 時間単価: $0.062/hour;
+  :常時起動 (24h/day) の月額を算出;
+  :時間制限運用 (0.5h/day) の月額を算出;
+  :削減額・削減率・年間削減額を表示;
+}
+
+stop
+
+@enduml

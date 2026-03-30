@@ -1,0 +1,91 @@
+@startuml 01_load_northwind_to_rds
+
+title 01. Northwindデータ → RDS PostgreSQL 投入
+
+start
+
+partition "接続情報の取得" {
+
+:Databricks Secrets から接続情報を取得
+  - DB_HOST (rds-host)
+  - DB_USER (rds-user)
+  - DB_PASSWORD (rds-password)
+  - DB_NAME = "northwind"
+  - DB_PORT = 5432;
+
+}
+
+partition "JDBC接続情報の構築" {
+
+:JDBC URL を構築
+  jdbc:postgresql://{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require;
+
+:connection_properties を設定
+  (user, password, driver);
+
+}
+
+partition "PostgreSQLドライバのインストール" {
+
+:pip install psycopg2-binary;
+
+}
+
+partition "northwind.sql のダウンロードと実行" {
+
+:GitHub から northwind.sql をダウンロード
+  URL: pthom/northwind_psql/master/northwind.sql;
+
+:ダウンロード完了（バイト数を表示）;
+
+}
+
+partition "DDL + データ投入の実行" {
+
+group try-except
+  :psycopg2 で RDS に接続
+    (host, port, database, user, password, sslmode);
+
+  :conn.autocommit = True;
+
+  :cursor.execute(northwind_sql)
+    DDL + INSERT + PRIMARY KEY + FK 全て実行;
+
+  :cursor.close() / conn.close();
+
+  :northwind.sql 実行完了;
+
+  detach
+
+  #pink:例外発生時のエラーハンドリング
+    - Secret Scope の接続情報確認
+    - VPC 設定確認
+    - Security Group 5432 ポート確認;
+
+  :raise e（例外を再送出）;
+
+}
+
+  stop
+end group
+
+partition "データ確認" {
+
+:全14テーブルの件数確認リストを定義;
+
+while (各テーブルについて) is (次のテーブル)
+  group try-except
+    :spark.read.jdbc でテーブルを読み込み;
+    :df.count() で件数を取得・表示;
+    detach
+    :テーブル読み取りエラーを警告表示;
+  end group
+endwhile (完了)
+
+:完了チェックリスト表示;
+
+}
+
+stop
+
+@enduml

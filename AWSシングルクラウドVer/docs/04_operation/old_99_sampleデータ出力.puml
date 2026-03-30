@@ -1,0 +1,63 @@
+@startuml old_99_sampleデータ出力
+
+title サンプルデータ CSV 出力 (Databricks Notebook) フロー図
+
+start
+
+partition "1. 初期設定と出力先 Volume の準備" {
+:定数設定
+  TARGET_CATALOG, EXPORT_SCHEMA,
+  EXPORT_VOLUME, SAMPLE_LIMIT;
+:CREATE SCHEMA IF NOT EXISTS (exports);
+:CREATE VOLUME IF NOT EXISTS (sample_data);
+:出力先パスを組み立て;
+
+}
+
+partition "2. サンプルデータの抽出と CSV 出力処理" {
+:SHOW SCHEMAS IN northwind_catalog;
+
+while (スキーマを順に処理?) is (あり)
+  :schema_name を取得;
+
+  if (information_schema または exports?) then (はい)
+    :除外してスキップ;
+  else (いいえ)
+    :SHOW TABLES IN スキーマ;
+    note right: 例外発生時はスキップしてログ出力
+
+    while (テーブルを順に処理?) is (あり)
+      :table_name を取得;
+
+      if (一時テーブル (isTemporary) ?) then (はい)
+        :スキップ;
+      else (いいえ)
+        :完全修飾テーブル名を組み立て;
+        :SELECT * FROM テーブル LIMIT 10;
+        note right: 例外発生時はエラーログ出力
+
+        if (データが空 (isEmpty) ?) then (はい)
+          :スキップしてログ出力;
+        else (いいえ)
+          :出力パスを組み立て
+            (Volume/スキーマ/テーブル);
+          :CSV 形式で書き出し
+            (ヘッダー付き, 上書きモード);
+          :出力完了をログ出力;
+        endif
+      endif
+    endwhile (なし)
+  endif
+endwhile (なし)
+
+}
+
+partition "完了" {
+:完了メッセージを表示;
+:カタログからのダウンロード方法を案内;
+
+}
+
+stop
+
+@enduml

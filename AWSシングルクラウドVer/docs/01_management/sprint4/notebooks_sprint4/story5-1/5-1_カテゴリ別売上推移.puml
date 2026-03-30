@@ -1,0 +1,20 @@
+@startuml 5-1_カテゴリ別売上推移
+title カテゴリ別月次売上推移
+start
+
+:gold.sales_by_category\nからデータ読み込み;
+
+:SELECT
+  category_name,
+  MAKE_DATE(order_year, order_month, 1)
+    AS order_month,
+  total_sales,
+  total_quantity,
+  order_count;
+
+:ORDER BY order_month, category_name;
+
+:カテゴリ×月の売上推移を出力;
+
+stop
+@enduml

@@ -1,0 +1,39 @@
+@startuml 5-2_在庫状況一覧
+title 在庫状況一覧（全商品リスク判定付き）
+start
+
+fork
+  :silver.products (p)\nからデータ読み込み;
+fork again
+  :bronze.categories (c)\nからデータ読み込み;
+end fork
+
+:LEFT JOIN\np.category_id = c.category_id;
+
+:CASE で stock_status 判定;
+if (discontinued == 1?) then (はい)
+  :stock_status = '廃止';
+elseif (units_in_stock == 0?) then (はい)
+  :stock_status = '在庫切れ';
+elseif (stock <= reorder_level\nAND on_order == 0?) then (はい)
+  :stock_status = '発注点割れ（未発注）';
+elseif (stock <= reorder_level\nAND on_order > 0?) then (はい)
+  :stock_status = '発注点割れ（発注済）';
+else (いいえ)
+  :stock_status = '正常';
+endif
+
+:ORDER BY リスク優先度;
+note right
+  ソート順:
+  1. 在庫切れ
+  2. 発注点割れ（未発注）
+  3. 発注点割れ（発注済）
+  4. 廃止
+  5. 正常
+end note
+
+:全商品の在庫状況一覧を出力;
+
+stop
+@enduml

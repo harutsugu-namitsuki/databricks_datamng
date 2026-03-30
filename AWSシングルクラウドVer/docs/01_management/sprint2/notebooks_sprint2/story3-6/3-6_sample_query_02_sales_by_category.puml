@@ -1,0 +1,47 @@
+@startuml
+title 商品カテゴリ別の売上\n(3-6_sample_query_02_sales_by_category)
+
+start
+
+partition "データソース読み込み" {
+
+fork
+  :silver.order_details (od)\n注文明細データ;
+fork again
+  :silver.products (p)\n商品データ;
+fork again
+  :bronze.categories (cat)\nカテゴリデータ;
+end fork
+
+}
+
+partition "JOIN" {
+:order_details JOIN products\nON od.product_id = p.product_id;
+:結果 JOIN categories\nON p.category_id = cat.category_id;
+
+}
+
+partition "集計" {
+:GROUP BY cat.category_name\n(カテゴリ別に集約);
+
+}
+
+partition "計算カラム" {
+note right
+  * category_name: カテゴリ名
+  * total_sales: SUM(単価 x 数量 x (1 - 割引率))  ROUND 2桁
+  * total_quantity: SUM(数量)
+end note
+
+}
+
+partition "ソート" {
+:ORDER BY total_sales DESC\n(売上金額の降順);
+
+:結果出力;
+
+}
+
+stop
+
+@enduml

@@ -1,0 +1,52 @@
+@startuml
+title EDA - データ概要確認\n(nb_01_eda_data_overview)
+
+start
+
+:カタログ名・Gold層テーブル一覧を定義;
+note right
+  CATALOG_NAME = "northwind_catalog"
+  対象: sales_by_product,
+        sales_by_customer,
+        sales_by_category,
+        order_summary
+end note
+
+:Gold層テーブルの件数・カラム数を一覧表示;
+while (全Gold層テーブルをループ) is (次のテーブル)
+  :spark.table() でテーブル読み込み;
+  :件数(count)・カラム数を出力;
+endwhile (完了)
+
+partition "sales_by_product 分析" {
+  :スキーマ表示 (printSchema);
+  :サンプルデータ表示 (limit 20);
+  :基本統計量の算出 (describe);
+
+  :データ期間の確認;
+  note right
+    min_date / max_date
+    商品数 / 月数
+  end note
+
+  :商品ごとのレコード数集計;
+  note right
+    月数カバレッジ・
+    累計売上で降順ソート
+  end note
+
+  :NULL・ゼロ値チェック;
+  note right
+    total_sales の NULL/ゼロ
+    total_quantity の NULL
+    order_count の NULL
+  end note
+}
+
+partition "order_summary 分析" {
+  :スキーマ表示 (printSchema);
+  :基本統計量の算出 (describe);
+}
+
+stop
+@enduml

@@ -1,0 +1,46 @@
+@startuml
+title AutoML 用データ準備\n(nb_01_automl_data_prep)
+
+start
+
+:カタログ名・学習テーブル名を定義;
+note right
+  TRAINING_TABLE =
+  northwind_catalog.gold.ml_training_sales
+end note
+
+:gold.sales_by_product を読み込み;
+:元データ件数を出力・サンプル表示;
+
+partition "特徴量エンジニアリング" {
+  :silver.products を読み込み\n(product_id, category_id, unit_price);
+  :bronze.categories を読み込み\n(category_id, category_name);
+
+  :order_date 列を追加\n(order_year + order_month から生成);
+  :products テーブルを LEFT JOIN\n(カテゴリID・単価の付与);
+  :categories テーブルを LEFT JOIN\n(カテゴリ名の付与);
+
+  :学習用カラムを選択;
+  note right
+    order_date, order_year,
+    order_month, product_id,
+    product_name, category_name,
+    unit_price, total_quantity,
+    order_count, total_sales (target)
+  end note
+
+  :order_date + product_id でソート;
+}
+
+:学習データ件数・スキーマを出力;
+:サンプルデータを表示;
+
+partition "学習データ保存" {
+  :Delta形式で overwrite 保存\n(ml_training_sales テーブル);
+  :保存完了メッセージ・件数を出力;
+}
+
+:保存データの基本統計量を表示 (describe);
+
+stop
+@enduml

@@ -1,0 +1,43 @@
+@startuml
+title 在庫切れの商品一覧\n(3-6_sample_query_04_out_of_stock)
+
+start
+
+partition "データソース読み込み" {
+
+fork
+  :silver.products (p)\n商品データ;
+fork again
+  :bronze.categories (cat)\nカテゴリデータ;
+fork again
+  :bronze.suppliers (s)\nサプライヤーデータ;
+end fork
+
+}
+
+partition "JOIN" {
+:products JOIN categories\nON p.category_id = cat.category_id;
+:結果 JOIN suppliers\nON p.supplier_id = s.supplier_id;
+
+}
+
+partition "フィルタ条件 (WHERE)" {
+:units_in_stock = 0\n(在庫数がゼロ);
+:AND discontinued = 0\n(販売終了していない);
+
+}
+
+partition "出力カラム" {
+note right
+  * product_name: 商品名
+  * category_name: カテゴリ名
+  * supplier_name: サプライヤー名
+end note
+
+:結果出力;
+
+}
+
+stop
+
+@enduml

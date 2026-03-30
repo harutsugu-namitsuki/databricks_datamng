@@ -1,0 +1,22 @@
+@startuml 5-1_商品別売上ランキング
+title 商品別売上ランキング TOP 20
+start
+
+:gold.sales_by_product\nからデータ読み込み;
+
+:GROUP BY product_name;
+note right
+  集計項目:
+  SUM(total_sales)
+  SUM(total_quantity)
+  SUM(order_count)
+end note
+
+:ORDER BY total_sales DESC;
+
+:LIMIT 20\n（上位20商品に絞り込み）;
+
+:商品別売上ランキングを出力;
+
+stop
+@enduml

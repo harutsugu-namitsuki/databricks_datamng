@@ -1,0 +1,20 @@
+@startuml 5-1_顧客別売上
+title 顧客別売上集計
+start
+
+:gold.sales_by_customer\nからデータ読み込み;
+
+:GROUP BY company_name, country;
+note right
+  集計項目:
+  SUM(total_sales)
+  SUM(order_count)
+  AVG(avg_order_value)
+end note
+
+:ORDER BY total_sales DESC;
+
+:顧客別売上一覧を出力;
+
+stop
+@enduml

@@ -1,0 +1,72 @@
+@startuml
+title NAT Gateway 削除 Lambda (nb_02_nat_delete_lambda)
+
+start
+
+:Lambda ハンドラー開始;
+note right: lambda_handler(event, context)
+
+partition "Step 1: 対象 NAT Gateway 検索" {
+:ManagedBy=lambda-nat-manager の\nNAT Gateway を検索\n(state=available/pending);
+
+if (対象の NAT Gateway あり?) then (いいえ)
+  :「削除対象なし」を返却;
+}
+
+  stop
+else (はい)
+  :検出した NAT Gateway 数を記録;
+endif
+
+repeat
+  :NAT Gateway を1つ取り出す;
+
+partition "Step 2: ルート削除" {
+  :Private Route Table から\n0.0.0.0/0 ルートを削除;
+
+  if (ルートが存在しない?) then (はい)
+    :スキップ (既に削除済み);
+  else (いいえ)
+    :ルート削除完了;
+  endif
+
+}
+
+partition "Step 3: NAT Gateway 削除" {
+  :関連する EIP の AllocationId を\n事前に記録;
+  :NAT Gateway 削除リクエスト送信;
+
+}
+
+partition "Step 4: Deleted 待機" {
+  :NAT Gateway が Deleted になるまでポーリング\n(15秒間隔 x 最大20回);
+
+  if (タイムアウト?) then (はい)
+    :WARNING ログ出力\n(削除中の可能性);
+  else (いいえ)
+    :Deleted 確認完了;
+  endif
+
+}
+
+partition "Step 5: Elastic IP 解放" {
+
+  while (未解放の EIP あり?) is (はい)
+    :EIP を解放 (release_address);
+    if (既に解放済み?) then (はい)
+      :スキップ;
+    else (いいえ)
+      :解放完了;
+    endif
+  endwhile (いいえ)
+
+repeat while (未処理の NAT Gateway あり?) is (はい)
+->いいえ;
+
+:結果を返却\n(deleted_gateways, released_eips);
+
+}
+
+stop
+
+@enduml

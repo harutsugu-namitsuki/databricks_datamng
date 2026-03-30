@@ -1,0 +1,22 @@
+@startuml 5-1_月別売上推移
+title 月別売上推移
+start
+
+:gold.order_summary\nからデータ読み込み;
+
+:DATE_TRUNC('month', order_date)\nで月単位に集約;
+
+:GROUP BY order_month;
+note right
+  集計項目:
+  SUM(total_sales) → monthly_sales
+  SUM(line_count) → monthly_orders
+  AVG(avg_line_value) → avg_order_value
+end note
+
+:ORDER BY order_month;
+
+:月別売上推移を出力;
+
+stop
+@enduml

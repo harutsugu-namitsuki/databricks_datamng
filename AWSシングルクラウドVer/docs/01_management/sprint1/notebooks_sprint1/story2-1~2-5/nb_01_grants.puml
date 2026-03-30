@@ -1,0 +1,43 @@
+@startuml nb_01_grants
+title analyst_group 権限設定（Story 2-2）
+start
+
+note right
+  実行前提:
+  admin アカウント
+  (metastore admin or catalog owner)
+end note
+
+partition "Step 2-4-1: カタログ USE 権限" {
+
+:GRANT USE CATALOG\nON northwind_catalog\nTO analyst_group;
+
+}
+
+partition "Step 2-4-2: Gold スキーマ権限" {
+
+:GRANT USE SCHEMA\nON northwind_catalog.gold\nTO analyst_group;
+
+:GRANT SELECT\nON northwind_catalog.gold\nTO analyst_group;
+
+note right
+  bronze / silver / ops は
+  意図的に付与しない
+  (デフォルト拒否)
+end note
+
+}
+
+partition "Step 2-5: 付与確認" {
+
+:SHOW GRANTS ON SCHEMA\nnorthwind_catalog.gold;
+note right
+  期待結果:
+  analyst_group に
+  USE SCHEMA と SELECT が表示
+end note
+
+}
+
+stop
+@enduml

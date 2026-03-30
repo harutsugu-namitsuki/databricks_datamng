@@ -1,0 +1,70 @@
+@startuml nb_e1_00_duplicate_check
+title Bronze/Silver層 重複チェック（修正前現状確認）
+start
+
+:カタログ名・テーブルリスト定義;
+note right
+  CATALOG_NAME = "northwind_catalog"
+  Bronze 14テーブル
+end note
+
+partition "セル1: Bronze層 _load_date 別件数" {
+
+:ヘッダー出力;
+while (bronze_tables をループ) is (次のテーブル)
+  :SQL実行\n_load_date ごとの COUNT(*) を取得;
+  while (_load_date 行をループ) is (次の行)
+    :テーブル名・_load_date・件数を出力;
+  endwhile (完了)
+endwhile (全テーブル完了)
+
+}
+
+partition "セル2: Bronze層 主キー重複チェック" {
+
+:PRIMARY_KEYS 辞書を定義\n(14テーブル分の主キー列);
+:has_dup = False;
+
+while (PRIMARY_KEYS をループ) is (次のテーブル)
+  :全件数 COUNT(*) を取得;
+  :主キー GROUP BY で\nユニーク件数を取得;
+  :重複件数 = 全件数 - ユニーク件数;
+  if (重複 > 0?) then (はい)
+    :status = "[DUP]";
+    :has_dup = True;
+  else (いいえ)
+    :status = "[ OK]";
+  endif
+  :結果を出力;
+endwhile (全テーブル完了)
+
+if (has_dup?) then (True)
+  :⚠️ 重複検出 → 冪等化修正が必要;
+else (False)
+  :✅ 重複なし;
+endif
+
+}
+
+partition "セル3: Silver層 主キー重複チェック" {
+
+:SILVER_PRIMARY_KEYS 辞書を定義\n(4テーブル);
+
+while (SILVER_PRIMARY_KEYS をループ) is (次のテーブル)
+  :全件数・ユニーク件数を取得;
+  if (例外発生?) then (はい)
+    :[ERR] エラー出力;
+  else (いいえ)
+    :重複件数を計算;
+    if (重複 > 0?) then (はい)
+      :[DUP] 重複あり;
+    else (いいえ)
+      :[ OK] 重複なし;
+    endif
+  endif
+endwhile (全テーブル完了)
+
+}
+
+stop
+@enduml

@@ -1,0 +1,110 @@
+@startuml 04_etl_gold_aggregate
+
+title 04. Gold層 集計（AWSシングルクラウド版）
+
+start
+
+partition "初期設定" {
+
+:CATALOG_NAME = "northwind_catalog";
+
+:USE CATALOG {CATALOG_NAME};
+
+}
+
+partition "Gold: 商品別売上 (sales_by_product)" {
+
+:Silver層テーブルを読み込み
+  - silver.order_details (df_od)
+  - silver.products (df_p)
+  - silver.orders (df_o);
+
+:order_details JOIN products (product_id)
+  JOIN orders (order_id);
+
+:order_year / order_month カラムを追加;
+
+:groupBy(product_id, product_name,
+  order_year, order_month)
+  集計:
+  - total_sales = sum(line_total)
+  - total_quantity = sum(quantity)
+  - order_count = count(order_id);
+
+:gold.sales_by_product に overwrite 保存;
+
+}
+
+partition "Gold: 顧客別売上 (sales_by_customer)" {
+
+:silver.customers (df_c) を読み込み;
+
+:order_details JOIN orders (order_id)
+  JOIN customers (customer_id);
+
+:order_year / order_month カラムを追加;
+
+:groupBy(customer_id, company_name,
+  country, order_year, order_month)
+  集計:
+  - total_sales = sum(line_total)
+  - order_count = count(order_id)
+  - avg_order_value = avg(line_total);
+
+:gold.sales_by_customer に overwrite 保存;
+
+}
+
+partition "Gold: カテゴリ別売上 (sales_by_category)" {
+
+:bronze.categories (df_cat) を読み込み
+  (category_id, category_name のみ);
+
+:order_details JOIN products (product_id)
+  JOIN orders (order_id)
+  JOIN categories (category_id);
+
+:order_year / order_month カラムを追加;
+
+:groupBy(category_id, category_name,
+  order_year, order_month)
+  集計:
+  - total_sales = sum(line_total)
+  - total_quantity = sum(quantity)
+  - order_count = count(order_id);
+
+:gold.sales_by_category に overwrite 保存;
+
+}
+
+partition "Gold: 受注サマリ (order_summary)" {
+
+:orders JOIN order_details (order_id);
+
+:groupBy(order_date)
+  集計:
+  - line_count = count(order_id)
+  - total_sales = sum(line_total)
+  - avg_line_value = avg(line_total);
+
+:gold.order_summary に overwrite 保存;
+
+}
+
+partition "ジョブ完了ログ" {
+
+:run_id を生成 (UUID);
+
+:ジョブログを作成
+  - job_name = "04_etl_gold_aggregate"
+  - status = "SUCCESS";
+
+:ops.job_runs に append 保存;
+
+:パイプライン完了;
+
+}
+
+stop
+
+@enduml

@@ -1,0 +1,79 @@
+@startuml northwind
+title Northwind PostgreSQL DDL + データ投入
+start
+
+partition "Phase 1: セッション設定" {
+
+:SET statement_timeout = 0;
+:SET client_encoding = 'UTF8';
+:その他セッションパラメータ設定;
+
+}
+
+partition "Phase 2: 既存テーブル削除（DROP）" {
+
+:DROP TABLE IF EXISTS\n(依存順で14テーブル);
+note right
+  削除順序（FK依存考慮）:
+  1. customer_customer_demo
+  2. customer_demographics
+  3. employee_territories
+  4. order_details
+  5. orders
+  6. customers
+  7. products
+  8. shippers
+  9. suppliers
+  10. territories
+  11. us_states
+  12. categories
+  13. region
+  14. employees
+end note
+
+}
+
+partition "Phase 3: テーブル作成（CREATE TABLE）" {
+
+partition "マスタテーブル" {
+  :CREATE TABLE categories;
+  :CREATE TABLE customers;
+  :CREATE TABLE employees;
+  :CREATE TABLE suppliers;
+  :CREATE TABLE shippers;
+  :CREATE TABLE products;
+  :CREATE TABLE region;
+}
+
+partition "トランザクションテーブル" {
+  :CREATE TABLE orders;
+  :CREATE TABLE order_details;
+}
+
+partition "参照テーブル" {
+  :CREATE TABLE territories;
+  :CREATE TABLE us_states;
+  :CREATE TABLE employee_territories;
+  :CREATE TABLE customer_demographics;
+  :CREATE TABLE customer_customer_demo;
+}
+
+}
+
+partition "Phase 4: データ投入（COPY / INSERT）" {
+
+while (14テーブル分のデータ) is (次のテーブル)
+  :COPY または INSERT で\nサンプルデータを投入;
+endwhile (全テーブル完了)
+
+}
+
+partition "Phase 5: 制約追加" {
+
+:ALTER TABLE ADD PRIMARY KEY\n(全テーブル);
+:ALTER TABLE ADD FOREIGN KEY\n(テーブル間リレーション);
+
+}
+
+stop
+@enduml

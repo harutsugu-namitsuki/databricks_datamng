@@ -1,0 +1,109 @@
+@startuml 99_export_sample_excel
+
+title サンプルデータ Excel 一括出力 フロー図
+
+start
+
+partition "1. 初期設定" {
+:pip install openpyxl;
+:定数設定
+  TARGET_CATALOG, EXPORT_SCHEMA,
+  EXPORT_VOLUME, SAMPLE_LIMIT,
+  FULL_EXPORT_THRESHOLD, LAYER_ORDER,
+  SKIP_SCHEMAS;
+:タイムスタンプ付き出力ファイル名を生成;
+
+}
+
+partition "2. 出力先 Volume の準備" {
+:CREATE SCHEMA IF NOT EXISTS (exports);
+:CREATE VOLUME IF NOT EXISTS (sample_data);
+:出力先パスを組み立て;
+
+}
+
+partition "3. カタログからテーブル一覧を収集" {
+:SHOW SCHEMAS IN northwind_catalog;
+:schema_tables 辞書を初期化;
+
+while (スキーマを順に処理?) is (あり)
+  if (SKIP_SCHEMAS に含まれる?) then (はい)
+    :スキップ;
+  else (いいえ)
+    :SHOW TABLES IN スキーマ;
+    note right: 例外発生時はスキップしてログ出力
+    :一時テーブルを除外しソート;
+    if (テーブルが存在する?) then (はい)
+      :schema_tables[スキーマ名] に格納;
+    else (いいえ)
+    endif
+  endif
+endwhile (なし)
+
+:合計テーブル数を表示;
+
+}
+
+partition "4. Excel ブック作成" {
+:BytesIO バッファを生成;
+:ExcelWriter を開く (openpyxl);
+
+partition "LAYER_ORDER 順に出力" {
+  while (LAYER_ORDER のレイヤーを順に処理?) is (あり)
+    :write_layer(layer) を呼び出し;
+  endwhile (なし)
+}
+
+partition "追加スキーマ出力" {
+  :LAYER_ORDER に含まれないスキーマを抽出;
+  while (追加スキーマを順に処理?) is (あり)
+    :write_layer(schema) を呼び出し;
+  endwhile (なし)
+}
+
+partition "write_layer(layer_name) 内部処理" {
+  if (layer_name が schema_tables に存在する?) then (いいえ)
+    :スキップしてログ出力;
+}
+
+    stop
+  else (はい)
+  endif
+  :区切りシート「layer→」を作成（空）;
+  while (レイヤー内のテーブルを順に処理?) is (あり)
+    :SELECT COUNT(*) でテーブル行数を取得;
+    note right: 例外発生時はエラーログ出力
+    if (行数 == 0?) then (はい)
+      :データなし、スキップ;
+    elseif (行数 <= 100?) then (はい)
+      :SELECT * で全量取得;
+    else (いいえ)
+      :SELECT * LIMIT 10 でサンプル取得;
+    endif
+    :toPandas() で変換;
+    :シートに書き出し;
+  endwhile (なし)
+}
+
+partition "列幅の自動調整" {
+  while (全ワークシートを順に処理?) is (あり)
+    while (全列を順に処理?) is (あり)
+      :セル値の最大文字数を計算;
+      :列幅を設定（最大50、余白+3）;
+    endwhile (なし)
+  endwhile (なし)
+}
+
+:ExcelWriter を閉じる;
+:合計シート数を表示;
+
+partition "5. Volume に Excel を書き出し" {
+:バッファから bytes を取得;
+:ファイルを書き出し;
+:出力完了メッセージとダウンロード方法を表示;
+
+}
+
+stop
+
+@enduml

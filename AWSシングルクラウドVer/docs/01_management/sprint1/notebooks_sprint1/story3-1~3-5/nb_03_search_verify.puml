@@ -1,0 +1,79 @@
+@startuml nb_03_search_verify
+title 検索・探索検証（Story 3-3）
+start
+
+partition "テスト1: domain:sales 検索" {
+
+:table_tags から\ndomain='sales' を検索;
+:結果を表示;
+if (件数 == 8?) then (PASS)
+  :[PASS] 8テーブル検出;
+else (FAIL)
+  :assert エラー;
+}
+
+  stop
+endif
+
+partition "テスト2: PII検索" {
+
+partition "2a: テーブルレベル" {
+  :table_tags から\npii='true' を検索;
+  if (件数 == 3?) then (PASS)
+    :[PASS] 3テーブル検出;
+  else (FAIL)
+    :assert エラー;
+}
+
+    stop
+  endif
+}
+
+partition "2b: カラムレベル" {
+  :column_tags から\npii='true' を検索;
+  if (件数 == 12?) then (PASS)
+    :[PASS] 12カラム検出;
+  else (FAIL)
+    :assert エラー;
+    stop
+  endif
+}
+
+partition "テスト3: data_type:aggregate 検索" {
+
+:table_tags から\ndata_type='aggregate' を検索;
+if (件数 == 4?) then (PASS)
+  :[PASS] 4テーブル検出;
+else (FAIL)
+  :assert エラー;
+}
+
+  stop
+endif
+
+partition "テスト4: キーワード「売上」検索" {
+
+:information_schema.tables から\ncomment LIKE '%売上%' で検索;
+if (件数 == 5?) then (PASS)
+  :[PASS] 5テーブル検出;
+else (FAIL)
+  :assert エラー;
+}
+
+  stop
+endif
+
+partition "テスト5: 複合条件（layer:gold AND domain:sales）" {
+
+:table_tags を自己JOIN\nlayer='gold' AND domain='sales';
+if (件数 == 4?) then (PASS)
+  :[PASS] 4テーブル検出;
+else (FAIL)
+  :assert エラー;
+}
+
+  stop
+endif
+
+stop
+@enduml

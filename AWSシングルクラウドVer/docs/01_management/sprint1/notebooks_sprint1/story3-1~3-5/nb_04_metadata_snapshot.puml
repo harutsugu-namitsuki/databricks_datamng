@@ -1,0 +1,28 @@
+@startuml nb_04_metadata_snapshot
+title 手動コメントのスナップショット取得（Story 3-4）
+start
+
+:CATALOG_NAME 定義;
+:manual_comments リストを初期化;
+
+while (各スキーマをループ\n(bronze, silver, gold, ops)) is (次のスキーマ)
+  :SHOW TABLES で\nテーブル一覧を取得;
+  while (各テーブルをループ) is (次のテーブル)
+    :DESCRIBE TABLE EXTENDED で\nテーブルコメントを取得;
+    :DESCRIBE TABLE で\nカラム一覧を取得;
+    while (各カラムをループ) is (次のカラム)
+      if (カラム名が "#" で始まる?) then (はい)
+        :スキップ（区切り行）;
+      else (いいえ)
+        :manual_comments に追加\n(schema, table, column,\n table_comment, column_comment);
+      endif
+    endwhile (完了)
+  endwhile (完了)
+endwhile (全スキーマ完了)
+
+:Spark DataFrame に変換;
+:ops.metadata_comparison_manual\nに Delta で overwrite 保存;
+:保存件数を出力;
+
+stop
+@enduml
