@@ -27,7 +27,8 @@
       "Bash(python3 -c \"print\\(''hello''\\)\")",
       "Bash(python -c \"print\\(''hello''\\)\")",
       "Bash(py -c \"print\\(''hello''\\)\")",
-      "Bash(py:*)"
+      "Bash(py:*)",
+      "WebFetch(domain:qiita.com)"
     ]
   }
 }
