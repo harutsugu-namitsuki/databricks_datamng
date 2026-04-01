@@ -1,0 +1,62 @@
+# CloudFormation パッチ: NAT Gateway の Lambda 動的管理への移行
+# CloudFormation Patch: Migrate NAT Gateway to Lambda dynamic management
+#
+# このファイルは cloudformation.yaml からどのリソースを削除・変更するかを示すパッチ定義です。
+# This file shows which resources to remove/modify from cloudformation.yaml.
+#
+# 手順書参照: Phase 1 Step 1-2
+# Reference: Phase 1 Step 1-2 in the implementation guide
+
+# ==============================================================================
+# 削除対象リソース / Resources to REMOVE from cloudformation.yaml
+# ==============================================================================
+
+# ---- 削除対象 1: Elastic IP (NAT Gateway 用の固定IPアドレス) ----
+# ---- Resource to remove 1: Elastic IP for NAT Gateway ----
+# 以下のブロックをコメントアウトまたは削除する
+#
+#   NatGatewayEIP:
+#     Type: AWS::EC2::EIP
+#     Properties:
+#       Domain: vpc
+#       Tags:
+#         - Key: Name
+#           Value: northwind-nat-eip
+
+# ---- 削除対象 2: NAT Gateway 本体 ----
+# ---- Resource to remove 2: NAT Gateway itself ----
+# 以下のブロックをコメントアウトまたは削除する
+#
+#   NatGateway:
+#     Type: AWS::EC2::NatGateway
+#     Properties:
+#       AllocationId: !GetAtt NatGatewayEIP.AllocationId
+#       SubnetId: !Ref PublicSubnet
+#       Tags:
+#         - Key: Name
+#           Value: northwind-nat
+
+# ==============================================================================
+# 変更対象リソース / Resource to MODIFY in cloudformation.yaml
+# ==============================================================================
+
+# ---- 変更対象: DefaultPrivateRoute ----
+# Lambda がルートを動的に追加・削除するため、CloudFormation 管理のルートは削除する。
+# Lambda dynamically manages routes, so remove the CloudFormation-managed route.
+
+# 変更前 / Before:
+#   DefaultPrivateRoute:
+#     Type: AWS::EC2::Route
+#     Properties:
+#       RouteTableId: !Ref PrivateRouteTable
+#       DestinationCidrBlock: 0.0.0.0/0
+#       NatGatewayId: !Ref NatGateway
+
+# 変更後 / After（リソースごと削除する）:
+#   # DefaultPrivateRoute: Lambda による動的管理に移行 / Migrated to Lambda dynamic management
+
+# ==============================================================================
+# 残すリソース / Resources to KEEP (do NOT remove)
+# ==============================================================================
+# - PrivateRouteTable: Lambda がルートを追加・削除するために使用するルートテーブル本体は残す
+#   The route table itself must remain so Lambda can add/remove routes dynamically.

@@ -1,0 +1,39 @@
+@startuml
+title RDS 起動 Lambda (nb_04_rds_start_lambda)
+
+start
+
+:Lambda ハンドラー開始;
+note right: lambda_handler(event, context)
+
+:RDS インスタンスの現在の状態を確認\n(describe_db_instances: northwind-db);
+
+if (status == "available"?) then (はい)
+  :既に起動済みを返却\n(冪等: 新規起動しない);
+  stop
+
+else if (status == "starting"?) then (はい)
+  :既に起動処理中を返却\n(冪等: 新規起動しない);
+  stop
+
+else if (status != "stopped"?) then (はい: 予期しない状態)
+  :エラーを返却\n(statusCode=400);
+  stop
+
+else (いいえ: stopped)
+endif
+
+partition "RDS 起動リクエスト" {
+  :start_db_instance を呼び出す\n(northwind-db);
+  note right
+    起動リクエストを送信するだけ。
+    Available になるまで待機しない。
+    実際の起動完了まで 10〜15分かかる。
+  end note
+}
+
+:結果を返却\n(statusCode=200, status="starting");
+
+stop
+
+@enduml

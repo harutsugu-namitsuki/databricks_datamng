@@ -1,0 +1,40 @@
+@startuml
+title RDS 停止 Lambda (nb_05_rds_stop_lambda)
+
+start
+
+:Lambda ハンドラー開始;
+note right: lambda_handler(event, context)
+
+:RDS インスタンスの現在の状態を確認\n(describe_db_instances: northwind-db);
+
+if (status == "stopped"?) then (はい)
+  :既に停止済みを返却\n(冪等: 新規停止しない);
+  stop
+
+else if (status == "stopping"?) then (はい)
+  :既に停止処理中を返却\n(冪等: 新規停止しない);
+  stop
+
+else if (status != "available"?) then (はい: 予期しない状態)
+  :エラーを返却\n(statusCode=400);
+  stop
+
+else (いいえ: available)
+endif
+
+partition "RDS 停止リクエスト" {
+  :stop_db_instance を呼び出す\n(northwind-db);
+  note right
+    停止リクエストを送信するだけ。
+    Stopped になるまで待機しない。
+    cleanup ノートブックおよび
+    安全ネット EventBridge から呼び出される。
+  end note
+}
+
+:結果を返却\n(statusCode=200, status="stopping");
+
+stop
+
+@enduml

@@ -1,0 +1,42 @@
+@startuml
+title Cleanup ノートブック (nb_06_cleanup)\nDatabricks Workflows cleanup タスク
+
+start
+
+note
+  実行条件: Run if = "All done"
+  （パイプライン成功・失敗いずれでも実行）
+  順番重要: RDS停止 → NAT削除
+  （RDS停止APIはNAT経由のインターネット接続が必要）
+end note
+
+partition "Step 1: RDS 停止" {
+  :northwind-rds-stop Lambda を同期呼び出し\n(InvocationType=RequestResponse);
+
+  if (statusCode == 200?) then (はい)
+    :✅ RDS 停止リクエスト成功;
+  else (いいえ)
+    :⚠️ RDS 停止で問題発生\n（NAT削除は続行する）;
+    note right
+      RDS停止失敗でも続行。
+      コスト防止（NAT課金継続）を優先。
+    end note
+  endif
+}
+
+partition "Step 2: NAT Gateway 削除" {
+  :northwind-nat-delete Lambda を同期呼び出し\n(InvocationType=RequestResponse)\n完了まで2〜5分;
+
+  if (statusCode == 200?) then (はい)
+    :✅ NAT Gateway 削除成功\n削除した NAT Gateway ID / 解放した EIP を表示;
+  else (いいえ)
+    :❌ NAT Gateway 削除失敗\nException を raise;
+    stop
+  endif
+}
+
+:最終サマリーを出力\n(RDS停止: 成功/要確認, NAT削除: 成功/失敗);
+
+stop
+
+@enduml

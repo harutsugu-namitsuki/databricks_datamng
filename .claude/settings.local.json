@@ -28,7 +28,9 @@
       "Bash(python -c \"print\\(''hello''\\)\")",
       "Bash(py -c \"print\\(''hello''\\)\")",
       "Bash(py:*)",
-      "WebFetch(domain:qiita.com)"
+      "WebFetch(domain:qiita.com)",
+      "Bash(powershell -Command \":*)",
+      "Bash(powershell -Command \"Copy-Item ''c:\\\\Users\\\\YuenongMei\\(梅月濃\\)\\\\OneDrive - 株式会社Dirbato\\\\ドキュメント\\\\GitHub\\\\databricks_datamng\\\\AWSシングルクラウドVer\\\\docs\\\\01_management\\\\sprint2\\\\notebooks_sprint2\\\\story1-6\\\\nb_01_nat_create_lambda.py'' ''c:\\\\Users\\\\YuenongMei\\(梅月濃\\)\\\\OneDrive - 株式会社Dirbato\\\\ドキュメント\\\\GitHub\\\\databricks_datamng\\\\AWSシングルクラウドVer\\\\docs\\\\01_management\\\\sprint2\\\\notebooks_sprint2\\\\story1-6\\\\nb_01_nat_create_lambda.txt''; Write-Host ''ok''\")"
     ]
   }
 }

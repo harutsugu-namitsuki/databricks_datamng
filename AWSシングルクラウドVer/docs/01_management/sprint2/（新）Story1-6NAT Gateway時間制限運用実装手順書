@@ -1,0 +1,900 @@
+手順書を精査しました。以下が現状の過不足です。
+
+---
+
+## 手順書に入っている / 入っていないの一覧
+
+| # | 要望 | 手順書に入っているか | 状態 |
+|---|---|---|---|
+| 1 | NAT Gateway 02:00自動削除（安全ネット） | ❌ **テスト計画にはあるが、作成手順がない** | EventBridge Schedule `northwind-nat-delete-schedule` を作る手順が欠落 |
+| 2 | RDS定時起動・定時停止 | ❌ **テスト計画にはあるが、作成手順がない** | RDS用Lambda 2つ、EventBridge Schedule 2つ、IAMポリシー追加の手順が全て欠落 |
+| 3 | RDS 02:00自動停止（安全ネット） | ❌ **テスト計画にはあるが、作成手順がない** | 要望1と同様 |
+| 4 | パイプラインのcleanupタスクでRDS停止+NAT削除（選択肢A） | ❌ **nat_deleteのみ。RDS停止が含まれていない** | ノートブックのコード、タスク名、IAM権限すべてNATのみ |
+| 5 | Serverless Computeでの分析確認 | ✅ **テスト計画Phase Dに入っている** | OK |
+
+**つまり、テスト計画は書かれているが、テスト対象の「実装手順」が欠落しています。**
+
+---
+
+以下、不足分を追加した改訂版手順書を出力します。変更箇所には `【追加】` マークを付けています。
+
+---
+
+# NAT Gateway 時間制限運用 実施手順書 / NAT Gateway Time-Limited Operation Guide（Story 1-6 / Sprint 2）
+
+## 概要 / Overview
+
+| 項目 / Item | 内容 / Details |
+|-----|------|
+| 対象 Story | 1-6 |
+| Epic | Epic 1: パイプラインの仕上げと自動化 / Pipeline Finalization & Automation |
+| 目的 / Purpose | NAT Gateway および RDS をパイプライン実行時のみ起動し、終了後に停止・削除することでコストを最小化する / Minimize costs by creating NAT Gateway and starting RDS only during pipeline execution, stopping/deleting them afterward |
+| 前提 / Prerequisites | Story 1-3（Databricks Workflows Job `northwind_daily_pipeline`）が設定済みであること / Story 1-3 (Databricks Workflows Job) must be configured |
+
+### なぜ NAT Gateway・RDS の時間制限運用が必要なのか？ / Why is time-limited operation needed?
+
+NAT Gateway（ナットゲートウェイ）とは、プライベートサブネット内のリソース（Databricks のクラスターなど）がインターネットに出るための「出口」です。
+
+| リソース / Resource | 常時起動 / Always-on | 動的管理 / Dynamic | 削減率 / Savings |
+|---|---|---|---|
+| NAT Gateway | **約 $45/月** | **約 $0.95/月** | **約97%** |
+| RDS (db.t3.micro) | **約 $21/月** | **約 $2.4/月** | **約89%** |
+| **合計 / Total** | **約 $66/月** | **約 $3.3/月** | **約95%** |
+
+### 仕組みの全体像 / Architecture Overview
+
+> **重要な設計ポイント / Critical Design Point:**
+> Databricks の Job Cluster はコントロールプレーンとの通信に NAT Gateway が必要です。つまり、NAT Gateway が存在しない状態では Job Cluster を起動できません（鶏と卵問題）。
+> また、RDS の起動には 10〜15分かかるため、NAT Gateway よりさらに前に起動する必要があります。
+>
+> Databricks Job Clusters require NAT Gateway for control plane communication. Without NAT Gateway, clusters cannot start (chicken-and-egg problem).
+> Additionally, RDS startup takes 10-15 minutes, so it must be started even earlier than NAT Gateway.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Amazon EventBridge Scheduler                                │
+│                                                              │
+│  05:45 JST (UTC 20:45)                                       │
+│     → northwind-rds-start Lambda を実行                       │
+│     → RDS 起動（約10〜15分で完了）                              │
+│                                                              │
+│  06:00 JST (UTC 21:00)                                       │
+│     → northwind-nat-create Lambda を実行                      │
+│     → NAT Gateway 作成（約3分で完了）                          │
+│                                                              │
+│  02:00 JST (UTC 17:00) ← 安全ネット / Safety net              │
+│     → northwind-nat-delete Lambda を実行                      │
+│     → northwind-rds-stop Lambda を実行                        │
+│     → 消し忘れ防止（既に停止済みなら何もしない）                  │
+└──────────────────────────────────────────────────────────────┘
+                         ↓  10分後 / 10 min later
+┌──────────────────────────────────────────────────────────────┐
+│  Databricks Workflows Job: northwind_daily_pipeline          │
+│  スケジュール / Schedule: 06:10 JST                            │
+│  （NAT Gateway・RDS が既に Available のため、実行可能）          │
+│                                                              │
+│  ┌──────────────┐                                            │
+│  │ Task 1       │                                            │
+│  │ bronze_ingest│  既存のETLパイプライン                        │
+│  └──────┬───────┘  Existing ETL pipeline                     │
+│         ↓                                                    │
+│  ┌──────────────┐                                            │
+│  │ Task 2       │                                            │
+│  │ silver_      │                                            │
+│  │ transform    │                                            │
+│  └──────┬───────┘                                            │
+│         ↓                                                    │
+│  ┌──────────────┐                                            │
+│  │ Task 3       │                                            │
+│  │ gold_        │                                            │
+│  │ aggregate    │                                            │
+│  └──────┬───────┘                                            │
+│         ↓                                                    │
+│  ┌──────────────┐                                            │
+│  │ Task 4       │  RDS停止 → NAT Gateway削除                  │
+│  │ cleanup      │  Stop RDS → Delete NAT Gateway              │
+│  │ (Lambda呼出) │  ※順番重要: RDS停止にNATが必要なため          │
+│  │ Run if:      │  成功でも失敗でも実行                         │
+│  │ All done     │  Runs on success or failure                  │
+│  └──────────────┘                                            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 関連ノートブック / Related Notebooks
+
+| ノートブック / Notebook | 用途 / Purpose |
+|------------|------|
+| `notebooks_sprint2/story1-6/nb_01_nat_create_lambda.py` | NAT Gateway 作成用 Lambda 関数コード / Lambda function code to create NAT Gateway |
+| `notebooks_sprint2/story1-6/nb_02_nat_delete_lambda.py` | NAT Gateway 削除用 Lambda 関数コード / Lambda function code to delete NAT Gateway |
+| `notebooks_sprint2/story1-6/nb_03_nat_verify.py` | 動作確認用ノートブック（Databricks上で実行） / Verification notebook (run on Databricks) |
+
+---
+
+## Phase 1: 既存 NAT Gateway の削除（手動） / Remove Existing NAT Gateway (Manual)
+
+### 目的 / Purpose
+
+現在 CloudFormation で常時起動している NAT Gateway を削除し、Lambda による動的管理に切り替える準備をする。
+
+Remove the always-on NAT Gateway currently managed by CloudFormation, preparing for dynamic management via Lambda.
+
+### Step 1-1: 現在の NAT Gateway を確認する / Confirm current NAT Gateway
+
+**目的**: 削除対象の NAT Gateway が存在することを確認する。
+
+1. ブラウザで **AWS Management Console** にログインする
+   - Login to the AWS Management Console in your browser
+2. 画面上部の検索バー（Search bar）に **`VPC`** と入力し、**VPC サービス** を開く
+   - Type `VPC` in the top search bar and open the VPC service
+3. 左メニューから **「NAT ゲートウェイ」（NAT gateways）** をクリックする
+   - Click **"NAT gateways"** in the left menu
+4. `northwind-nat` という名前の NAT Gateway が **Available** 状態であることを確認する
+   - Confirm that `northwind-nat` is in **Available** state
+
+> **用語解説 / Glossary:**
+> - **NAT Gateway**: プライベートネットワーク内のサーバーがインターネットにアクセスするための「翻訳機」。外からは入れないが、中からは出られる仕組み。
+>   A "translator" that allows servers in a private network to access the internet. Traffic can go out but not come in.
+> - **Available**: 正常に動作中の状態。
+>   Operational and running state.
+
+### Step 1-2: CloudFormation テンプレートから NAT Gateway リソースを除外する / Remove NAT Gateway resources from CloudFormation template
+
+**目的**: CloudFormation の管理対象から NAT Gateway を外し、Lambda で管理できるようにする。
+
+> **重要 / IMPORTANT**: CloudFormation テンプレートからリソース定義を削除してスタック更新すると、実際の AWS リソースも自動的に削除されます。手動で AWS コンソールから NAT Gateway を削除する必要はありません。
+>
+> When you remove resource definitions from a CloudFormation template and update the stack, the actual AWS resources are automatically deleted. You do NOT need to manually delete the NAT Gateway from the AWS console.
+
+1. リポジトリ内の `cloudformation.yaml` を開く
+   - Open `cloudformation.yaml` in the repository
+
+2. 以下の **3つのリソース** をコメントアウトまたは削除する
+   - Comment out or delete the following **3 resources**:
+
+削除対象リソースと変更内容は以下のファイルを参照:
+
+`notebooks_sprint2/story1-6/cf_patch_remove_nat_gateway.yaml`
+
+3. `DefaultPrivateRoute` は **削除せず**、ルートテーブル自体は残す（Lambda が後でルートを追加・削除するため）
+   - Do **NOT** delete `DefaultPrivateRoute` — keep the route table (Lambda will add/remove routes dynamically)
+
+### Step 1-3: CloudFormation スタックを更新する / Update CloudFormation stack
+
+**目的**: テンプレートの変更を AWS に反映し、NAT Gateway を実際に削除する。
+
+1. AWS Management Console → **CloudFormation** を開く
+   - Open **CloudFormation** in the AWS Management Console
+2. スタック `northwind-lakehouse` をクリックする
+   - Click on stack `northwind-lakehouse`
+3. 画面右上の **「更新」（Update）** ボタンをクリックする
+   - Click the **"Update"** button in the top right
+4. **「既存テンプレートを置き換える」（Replace existing template）** を選択する
+   - Select **"Replace existing template"**
+5. **「テンプレートファイルのアップロード」（Upload a template file）** を選択し、修正した `cloudformation.yaml` をアップロードする
+   - Select **"Upload a template file"** and upload the modified `cloudformation.yaml`
+6. **「次へ」（Next）** を3回クリックし、確認画面まで進む
+   - Click **"Next"** 3 times to reach the review screen
+7. 「変更セットのプレビュー（Change set preview）」で以下を確認する:
+   - Confirm the following in the "Change set preview":
+   - `NatGatewayEIP` — **Remove**
+   - `NatGateway` — **Remove**
+   - `DefaultPrivateRoute` — **Remove**
+8. **IAM 承認チェックボックス** にチェックを入れ、**「送信」（Submit）** をクリックする
+   - Check the **IAM acknowledgment checkbox** and click **"Submit"**
+9. ステータスが **`UPDATE_COMPLETE`** になるまで待つ（2〜5分）
+   - Wait until the status shows **`UPDATE_COMPLETE`** (2-5 minutes)
+
+### Step 1-4: NAT Gateway が削除されたことを確認する / Verify NAT Gateway deletion
+
+1. **VPC** → **NAT ゲートウェイ（NAT gateways）** を開く
+   - Open **VPC** → **NAT gateways**
+2. `northwind-nat` のステータスが **Deleted** になっていることを確認する
+   - Confirm `northwind-nat` status is **Deleted**
+
+> **確認ポイント / Checkpoint**: この時点で NAT Gateway は存在しないため、Databricks クラスターからインターネットへの外向き通信（GitHub からのダウンロードなど）はできなくなります。パイプラインが正常に動くのは Lambda が NAT Gateway を動的に作成してからです。
+>
+> At this point, outbound internet access from Databricks clusters is unavailable. The pipeline will only work after Lambda dynamically creates the NAT Gateway.
+
+---
+
+## Phase 2: Lambda 関数の作成 / Create Lambda Functions
+
+### 目的 / Purpose
+
+NAT Gateway を作成・削除する Lambda 関数と、RDS を起動・停止する Lambda 関数の計4つを AWS 上に作成する。
+
+Create four Lambda functions on AWS: NAT Gateway create/delete and RDS start/stop.
+
+> **用語解説 / Glossary:**
+> - **Lambda 関数（Lambda function）**: AWS 上で短いプログラムを実行するサービス。サーバーを用意する必要がなく、呼び出された時だけ動く。
+>   An AWS service that runs short programs. No server setup needed — runs only when invoked.
+> - **IAM ロール（IAM Role）**: Lambda 関数に「何をしていいか」を定義する権限証明書のようなもの。
+>   A permissions certificate defining what the Lambda function is allowed to do.
+
+### Step 2-1: Lambda 用 IAM ポリシーとロールを作成する / Create IAM Policy and Role for Lambda
+
+**目的**: Lambda 関数が NAT Gateway・Elastic IP・ルートテーブル・RDS を操作できるようにする権限を与える。
+
+> **手順の流れ / Flow:**
+> AWS Console のロール作成ウィザードでは、カスタムポリシーを途中で新規作成することができません。そのため**「ポリシー → ロール」の順**で作成します。
+>
+> In AWS Console, you cannot create a new custom policy mid-way through the role creation wizard. Therefore, create them in order: **policy first, then role**.
+
+#### Step 2-1a: ポリシーを先に作成する / Create the permissions policy first
+
+1. AWS Management Console → 検索バーに **`IAM`** と入力 → **IAM** を開く
+   - Search for `IAM` and open the IAM service
+2. 左メニューから **「ポリシー」（Policies）** をクリックする
+   - Click **"Policies"** in the left menu
+3. **「ポリシーの作成」（Create policy）** ボタンをクリックする
+   - Click **"Create policy"**
+4. **「ポリシーエディタ（Policy editor）」** セクションが表示される。デフォルトは **「ビジュアル（Visual）」** モード（ドロップダウン選択形式）になっている
+   - The **"Policy editor"** section appears. It defaults to **Visual** mode (dropdown selectors).
+5. エディタ上部の **「JSON」** ボタンをクリックして JSON 入力モードに切り替える
+   - Click the **"JSON"** button at the top of the editor to switch to JSON input mode
+
+   > **場所の目安 / Location**: エディタの上部に「ビジュアル（Visual）」「JSON」の 2 つのボタンがある。「JSON」をクリックするとテキスト入力エリアが表示される。
+   > There are two buttons at the top of the editor: "Visual" and "JSON". Clicking "JSON" reveals a text input area.
+
+6. 既存の内容を**すべて削除**し、以下のファイルの内容を貼り付ける
+   - **Delete all** existing content and paste the contents of the following file:
+
+`notebooks_sprint2/story1-6/iam_policy_nat_gateway_manager.json`
+
+7. **「次へ」（Next）** をクリックする
+   - Click **"Next"**
+8. ポリシー名（Policy name）に **`northwind-nat-gateway-manager-policy`** と入力する
+   - Enter **`northwind-nat-gateway-manager-policy`** as the policy name
+9. **「ポリシーの作成」（Create policy）** をクリックする
+   - Click **"Create policy"**
+
+#### Step 2-1b: ロールを作成し、ポリシーをアタッチする / Create the role and attach the policy
+
+1. 左メニューから **「ロール」（Roles）** をクリックする
+   - Click **"Roles"** in the left menu
+2. **「ロールを作成」（Create role）** ボタンをクリックする
+   - Click **"Create role"**
+3. 以下を設定する / Configure as follows:
+
+| 設定項目 / Setting | 値 / Value | 説明 / Explanation |
+|---|---|---|
+| 信頼されたエンティティタイプ / Trusted entity type | **AWS のサービス / AWS service** | Lambda がこのロールを使えるようにする |
+| ユースケース / Use case | **Lambda** | Lambda 専用のロール |
+
+4. **「次へ」（Next）** をクリックする
+5. **「許可を追加」（Add permissions）** 画面の検索バーに **`northwind-nat-gateway-manager-policy`** と入力して検索する
+   - On the "Add permissions" screen, search for **`northwind-nat-gateway-manager-policy`**
+6. 表示されたポリシーの**チェックボックス**にチェックを入れる
+   - Check the **checkbox** next to the policy
+7. **「次へ」（Next）** をクリックする
+   - Click **"Next"**
+8. ロール名（Role name）に **`northwind-nat-gateway-lambda-role`** と入力する
+   - Enter **`northwind-nat-gateway-lambda-role`** as the role name
+9. **「ロールを作成」（Create role）** をクリックする
+   - Click **"Create role"**
+
+> **補足: 「信頼ポリシー」と「許可ポリシー」の違い / Trust policy vs. Permissions policy:**
+> - **信頼ポリシー（Trust policy）**: 「誰がこのロールを使えるか」= Lambda がこのロールを使える。「AWS のサービス → Lambda」選択時に自動設定（JSON 不要）。
+> - **許可ポリシー（Permissions policy）**: 「このロールが何をできるか」= Step 2-1a で作成した JSON がこれ（ec2:CreateNatGateway, rds:StartDBInstance 等）。
+
+### Step 2-1c: Lambda コードで使用する実際の ID を取得する / Get the actual resource IDs for Lambda code
+
+**目的**: CloudFormation で定義されたリソース（Public Subnet、Private Route Table）の実際の ID を取得する。
+
+> **背景 / Background:**
+> CloudFormation テンプレートにはリソースの定義がありますが、実際の ID（`subnet-0abc...`、`rtb-0abc...`）は AWS が自動生成するため、コンソールで確認する必要があります。
+
+#### 方法 1: CloudFormation の「リソース」タブから取得（最も簡単）
+
+1. AWS Management Console → 検索バーに **`CloudFormation`** と入力 → **CloudFormation** を開く
+   - Search for `CloudFormation` and open the CloudFormation service
+2. スタック一覧から **`northwind-lakehouse`** をクリックする
+   - Click on **`northwind-lakehouse`** stack
+3. **「リソース」（Resources）** タブをクリックする
+   - Click the **"Resources"** tab
+4. 以下の 2 つのリソースを探して、**「物理 ID」（Physical ID）** をコピーする:
+   - Search for the following 2 resources and copy their **"Physical ID"**:
+
+| 論理 ID / Logical ID | リソース名 / Resource Name | コピー対象 / Copy Value |
+|---|---|---|
+| `PublicSubnet` | northwind-public-subnet | **`subnet-0xxxxxxxxxx`** → `PUBLIC_SUBNET_ID` に設定 |
+| `PrivateRouteTable` | northwind-private-rt | **`rtb-0xxxxxxxxxx`** → `PRIVATE_ROUTE_TABLE_ID` に設定 |
+
+#### 方法 2: VPC コンソールから取得（確認用）
+
+**Public Subnet ID を確認:**
+1. AWS Console → **VPC** → **「サブネット」（Subnets）** をクリック
+2. `northwind-public` または `northwind-public-subnet` を検索して見つける
+3. **「サブネット ID」（Subnet ID）** をコピーする
+
+**Private Route Table ID を確認:**
+1. AWS Console → **VPC** → **「ルートテーブル」（Route tables）** をクリック
+2. `northwind-private-rt` または `northwind-private` を検索して見つける
+3. **「ルートテーブル ID」（Route Table ID）** をコピーする
+
+#### コードに設定する / Set in Lambda code
+
+取得した ID を、後ほど作成する Lambda 関数コード内の以下の部分に設定します:
+
+```python
+PUBLIC_SUBNET_ID = "subnet-0xxxxxxxxxx"  # ← 上記で取得した Public Subnet ID
+PRIVATE_ROUTE_TABLE_ID = "rtb-0xxxxxxxxxx"  # ← 上記で取得した Private Route Table ID
+```
+
+---
+
+### Step 2-2: NAT Gateway 作成用 Lambda 関数を作成する / Create the NAT Gateway Creation Lambda
+
+**目的**: EventBridge Scheduler から呼び出されて NAT Gateway を自動作成する Lambda 関数を作る。
+
+1. AWS Management Console → 検索バーに **`Lambda`** と入力 → **Lambda** を開く
+2. **「関数の作成」（Create function）** をクリックする
+3. 以下を設定する:
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| オプション / Option | **一から作成 / Author from scratch** |
+| 関数名 / Function name | **`northwind-nat-create`** |
+| ランタイム / Runtime | **Python 3.12** |
+| アーキテクチャ / Architecture | **x86_64** |
+| 実行ロール / Execution role | **既存のロールを使用する / Use an existing role** |
+| 既存のロール / Existing role | **`northwind-nat-gateway-lambda-role`**（Step 2-1 で作成したもの） |
+
+4. **「関数の作成」（Create function）** をクリックする
+
+5. コードエディタが表示される。以下の手順でコードを貼り付ける:
+
+   1. エディタ左側のファイルツリーで **`lambda_function.py`** タブが選択されていることを確認する
+   2. エディタ内の既存コード（`import json` 等のデフォルトコード）を**すべて選択して削除**する（Ctrl+A → Delete）
+   3. **`nb_01_nat_create_lambda.py`** の内容を**まるごとコピーして貼り付ける** ※lambda_function.pyというファイル名は直さないこと
+   4. Public Subnet ID、Private Route Table IDはダミーから実際の値を記入すること（Step 2-1c 参照）
+
+   > **重要 / IMPORTANT**: `nb_01_nat_create_lambda.py` というファイル名のままアップロードしないこと。**必ず `lambda_function.py` の中身を置き換える形で**貼り付ける。ファイル名が違うと Lambda が `lambda_function` モジュールを見つけられず `Runtime.ImportModuleError` が発生する。
+
+6. **「Deploy」** ボタンをクリックしてデプロイする
+
+7. **「設定」（Configuration）** タブ → **「一般設定」（General configuration）** → **「編集」（Edit）** をクリックする
+
+8. **タイムアウト（Timeout）** を **5分（5 min 0 sec）** に変更する（NAT Gateway の作成には1〜3分かかるため）
+
+9. **「保存」（Save）** をクリックする
+
+> **冪等性について / About Idempotency:**
+> この Lambda 関数には**冪等性チェック**が組み込まれています。既に Lambda が管理する NAT Gateway（`ManagedBy=lambda-nat-manager` タグ）が存在する場合、新しい NAT Gateway を作成せずに既存のものを返します。これにより、EventBridge Scheduler の二重実行や手動での誤呼出しでも安全です。
+
+### Step 2-3: NAT Gateway 削除用 Lambda 関数を作成する / Create the NAT Gateway Deletion Lambda
+
+Step 2-2 と同様の手順で、以下の設定で作成する:
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| 関数名 / Function name | **`northwind-nat-delete`** |
+| ランタイム / Runtime | **Python 3.12** |
+| 実行ロール / Existing role | **`northwind-nat-gateway-lambda-role`**（同じロールを使用） |
+| タイムアウト / Timeout | **10分（10 min 0 sec）** |
+| コード / Code | `lambda_function.py` の中身を削除し、**`nb_02_nat_delete_lambda.py`** の内容を貼り付ける ※lambda_function.pyというファイル名は直さないこと |
+
+> **タイムアウトが10分の理由 / Why 10 minutes:**
+> 削除 Lambda は NAT Gateway の削除待機（最大15秒 x 20回 = 5分）+ Elastic IP の解放を行います。全体で5分を超える可能性があるため、余裕を持って **10分** に設定します。
+
+### 【追加】Step 2-4: RDS 起動用 Lambda 関数を作成する / Create the RDS Start Lambda
+
+**目的**: EventBridge Scheduler から呼び出されて RDS を自動起動する Lambda 関数を作る。
+
+Step 2-2 と同様の手順で、以下の設定で作成する:
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| 関数名 / Function name | **`northwind-rds-start`** |
+| ランタイム / Runtime | **Python 3.12** |
+| 実行ロール / Existing role | **`northwind-nat-gateway-lambda-role`**（同じロールを使用） |
+| タイムアウト / Timeout | **1分（1 min 0 sec）** |
+
+コードエディタで `lambda_function.py` の中身を以下のファイルの内容に置き換える:
+
+`notebooks_sprint2/story1-6/nb_04_rds_start_lambda.py`
+
+> **タイムアウトが1分の理由**: `start_db_instance` API は起動リクエストを送信するだけで、RDS が Available になるまで待機しません。API 呼出し自体は数秒で完了します。RDS が実際に Available になるまでの 10〜15分は EventBridge スケジュールのタイミングで吸収します。
+
+### 【追加】Step 2-5: RDS 停止用 Lambda 関数を作成する / Create the RDS Stop Lambda
+
+Step 2-4 と同様の手順で、以下の設定で作成する:
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| 関数名 / Function name | **`northwind-rds-stop`** |
+| ランタイム / Runtime | **Python 3.12** |
+| 実行ロール / Existing role | **`northwind-nat-gateway-lambda-role`**（同じロールを使用） |
+| タイムアウト / Timeout | **1分（1 min 0 sec）** |
+
+コードエディタで `lambda_function.py` の中身を以下のファイルの内容に置き換える:
+
+`notebooks_sprint2/story1-6/nb_05_rds_stop_lambda.py`
+
+### Step 2-6: Lambda 関数のテスト（NAT Gateway 作成） / Test Lambda Function (NAT Create)
+
+**目的**: NAT Gateway が正しく作成されることを確認する。
+
+1. Lambda コンソールで **`northwind-nat-create`** を開く
+2. **「テスト」（Test）** タブをクリックする
+3. テストイベント名（Event name）に **`test-create`** と入力する
+4. イベント JSON はデフォルトの `{}` のまま、**「テスト」（Test）** ボタンをクリックする
+5. 実行結果が **Succeeded**（緑色）になることを確認する
+6. レスポンスに以下が含まれることを確認する:
+   - `"statusCode": 200`
+   - `"nat_gateway_id": "nat-xxxxx"`
+   - `"state": "available"`
+
+> **冪等性の確認 / Verify Idempotency**: テストボタンを **もう一度クリック** して、2回目のレスポンスに `"message": "NAT Gateway already exists (idempotent)"` が含まれることを確認してください。
+
+### Step 2-7: Lambda 関数のテスト（NAT Gateway 削除） / Test Lambda Function (NAT Delete)
+
+1. Lambda コンソールで **`northwind-nat-delete`** を開く
+2. **「テスト」（Test）** タブで、イベント JSON を `{}` のまま **「テスト」（Test）** をクリックする
+3. 実行結果が **Succeeded**（緑色）になることを確認する
+4. レスポンスに `"statusCode": 200` が含まれることを確認する
+
+### Step 2-8: AWS コンソールで結果を確認する / Verify results in AWS Console
+
+1. **VPC** → **NAT ゲートウェイ（NAT gateways）** を開く
+2. Step 2-6 で作成された NAT Gateway が **Deleted** 状態になっていることを確認する
+
+---
+
+## Phase 3: EventBridge Scheduler の設定 / Configure EventBridge Scheduler
+
+### 目的 / Purpose
+
+Databricks Job の開始前に RDS 起動・NAT Gateway 作成を自動実行し、毎日 02:00 JST に安全ネットとして自動停止・削除するスケジュールを設定する。
+
+Configure EventBridge schedules to automatically start RDS and create NAT Gateway before the Databricks Job, and set up safety-net auto-shutdown at 02:00 JST daily.
+
+> **なぜ EventBridge Scheduler を使うのか？ / Why use EventBridge Scheduler?**
+>
+> Databricks の Job Cluster が起動するとき、コントロールプレーン（Databricks のクラウドサービス側）との通信が必要です。この通信には NAT Gateway 経由のインターネットアクセスが必要です。
+>
+> もし NAT Gateway の作成を Databricks Job のタスクとして実行しようとすると、「NAT Gateway がないから Job Cluster が起動できない → Job Cluster が起動できないから NAT Gateway を作成できない」という**鶏と卵問題（chicken-and-egg problem）**が発生します。
+>
+> EventBridge Scheduler は AWS 側で独立して動作するため、Databricks に依存せずに Lambda 関数を定期実行できます。
+
+### 【追加】Step 3-1: RDS 起動スケジュールを作成する / Create RDS Start Schedule
+
+**目的**: 毎日 05:45 JST に RDS 起動 Lambda を自動実行する。RDS は起動に 10〜15分かかるため、NAT Gateway 作成（06:00）より前に起動する。
+
+1. AWS Management Console → 検索バーに **`EventBridge`** と入力 → **Amazon EventBridge** を開く
+2. 左メニューから **「スケジュール」（Schedules）** をクリックする
+3. **「スケジュールを作成」（Create schedule）** をクリックする
+
+4. **「スケジュールの詳細を指定」（Specify schedule detail）** で以下を設定する:
+
+| 設定項目 / Setting | 値 / Value | 説明 / Explanation |
+|---|---|---|
+| スケジュール名 / Schedule name | **`northwind-rds-start-schedule`** | わかりやすい名前 |
+| スケジュールグループ / Schedule group | **default** | デフォルトグループを使用 |
+| スケジュールの種類 / Schedule type | **定期的なスケジュール / Recurring schedule** | 毎日繰り返し実行 |
+| スケジュールの種類 / Schedule type | **cron ベースのスケジュール / Cron-based schedule** | cron 式で指定 |
+| cron 式 / Cron expression | **`cron(45 20 ? * * *)`** | UTC 20:45 = JST 05:45 |
+| フレキシブルタイムウィンドウ / Flexible time window | **オフ / Off** | 正確な時刻に実行する |
+| タイムゾーン / Timezone | **UTC** | cron 式は UTC で指定済み |
+
+5. **「次へ」（Next）** をクリックする
+
+6. **「ターゲットを選択」（Select target）** で以下を設定する:
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| ターゲット API / Target API | **AWS Lambda — Invoke** |
+| Lambda 関数 / Lambda function | **`northwind-rds-start`** |
+| ペイロード / Payload | `{}` （デフォルトのまま） |
+
+7. **「次へ」（Next）** をクリックする
+
+8. **「設定」（Settings）** で以下を設定する:
+
+| 設定項目 / Setting | 値 / Value | 説明 / Explanation |
+|---|---|---|
+| リトライポリシー / Retry policy | **有効 / Enabled** | 失敗時にリトライする |
+| 最大リトライ回数 / Maximum retry attempts | **2** | 最大2回リトライ |
+| 最大イベント経過時間 / Maximum event age | **1時間 / 1 hour** | 1時間以内にリトライ |
+| 実行ロール / Execution role | **「このスケジュール用に新しいロールを作成」（Create new role for this schedule）** を選択 | コンソールが自動で正しい権限のロールを作成する |
+| ロール名 / Role name | **`northwind-eventbridge-rds-start-role`** | 自動作成されるロールの名前 |
+
+> **なぜ「新しいロールを作成」を使うのか / Why "Create new role":**
+>
+> IAM Console でロールを手動作成すると、EventBridge Scheduler 用の信頼ポリシー（`scheduler.amazonaws.com`）を自分で設定する必要があります。EventBridge Scheduler コンソールからロールを自動作成すると、対象 Lambda のみを呼び出せる最小権限ポリシーと正確な信頼ポリシーが自動設定されるため、ミスが防げます。
+>
+> Manual IAM role creation for EventBridge Scheduler requires configuring a custom trust policy for `scheduler.amazonaws.com`. Auto-creation via the Scheduler console correctly sets scoped permissions (invoke only the target Lambda) and the correct trust principal automatically.
+
+9. **「次へ」（Next）** をクリックし、確認画面で **「スケジュールを作成」（Create schedule）** をクリックする
+
+### Step 3-2: NAT Gateway 作成スケジュールを作成する / Create NAT Gateway Create Schedule
+
+**目的**: 毎日 06:00 JST に NAT Gateway 作成 Lambda を自動実行するスケジュールを作成する。
+
+Step 3-1 と同様の手順で、以下の設定で作成する:
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| スケジュール名 / Schedule name | **`northwind-nat-create-schedule`** |
+| cron 式 / Cron expression | **`cron(0 21 ? * * *)`** （UTC 21:00 = JST 06:00） |
+| ターゲット Lambda | **`northwind-nat-create`** |
+| 実行ロール / Role name | **`northwind-eventbridge-nat-create-role`**（新規作成） |
+
+> **cron 式の読み方 / How to read the cron expression:**
+> `cron(0 21 ? * * *)` = 「毎日 UTC 21:00（= JST 06:00）に実行する」
+
+### 【追加】Step 3-3: NAT Gateway 02:00 自動削除スケジュールを作成する（安全ネット） / Create NAT Gateway Safety-Net Delete Schedule
+
+**目的**: 毎日 02:00 JST に NAT Gateway 削除 Lambda を自動実行する。手動分析後の消し忘れ防止。NAT Gateway が存在しない場合は何もしない（冪等性）。
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| スケジュール名 / Schedule name | **`northwind-nat-delete-schedule`** |
+| cron 式 / Cron expression | **`cron(0 17 ? * * *)`** （UTC 17:00 = JST 02:00） |
+| ターゲット Lambda | **`northwind-nat-delete`** |
+| 実行ロール / Role name | **`northwind-eventbridge-nat-delete-role`**（新規作成） |
+
+### 【追加】Step 3-4: RDS 02:00 自動停止スケジュールを作成する（安全ネット） / Create RDS Safety-Net Stop Schedule
+
+**目的**: 毎日 02:00 JST に RDS 停止 Lambda を自動実行する。手動分析後の消し忘れ防止。RDS が既に停止中なら何もしない（冪等性）。
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| スケジュール名 / Schedule name | **`northwind-rds-stop-schedule`** |
+| cron 式 / Cron expression | **`cron(0 17 ? * * *)`** （UTC 17:00 = JST 02:00） |
+| ターゲット Lambda | **`northwind-rds-stop`** |
+| 実行ロール / Role name | **`northwind-eventbridge-rds-stop-role`**（新規作成） |
+
+### Step 3-5: Databricks Job のスケジュールを確認・調整する / Verify/Adjust Databricks Job Schedule
+
+**目的**: Databricks Job が RDS 起動・NAT Gateway 作成の **十分後** に開始するようにする。
+
+| EventBridge (RDS 起動) | EventBridge (NAT 作成) | Databricks Job | 差分 |
+|---|---|---|---|
+| 05:45 JST | 06:00 JST | **06:10 JST** | RDS起動から25分、NAT作成から10分 |
+
+1. Databricks UI → 左メニュー **「ジョブとパイプライン」（Jobs）** をクリック
+2. **`northwind_daily_pipeline`** をクリックして開く
+3. **「スケジュール」（Schedule）** セクションを確認する
+4. 開始時刻を **06:10 JST** に設定する
+
+**スクリーンショットを取得する / Take a screenshot**
+
+---
+
+## Phase 4: Databricks Workflows Job の更新 / Update Databricks Workflows Job
+
+### 目的 / Purpose
+
+既存の `northwind_daily_pipeline` Job に cleanup タスク（RDS 停止 + NAT Gateway 削除）を追加し、パイプライン完了後にリソースを自動停止・削除する構成にする。
+
+Add a cleanup task (RDS stop + NAT Gateway delete) to the existing `northwind_daily_pipeline` Job.
+
+### Step 4-1: Lambda 呼出権限の追加 / Add Lambda invocation permissions
+
+**目的**: Databricks クラスター（EC2）が NAT Gateway 削除 Lambda と RDS 停止 Lambda を呼び出せるようにする。
+
+1. AWS Management Console → **IAM** → **「ロール」（Roles）** を開く
+2. Databricks のワークスペースロール（例: `northwind-databricks-workspace-role`）を検索して開く
+3. **「許可を追加」（Add permissions）** → **「インラインポリシーを作成」（Create inline policy）** をクリック
+4. **JSON** タブで以下のファイルの内容を貼り付ける:
+
+`notebooks_sprint2/story1-6/iam_policy_databricks_lambda_invoke.json`
+
+5. ポリシー名に **`northwind-lambda-invoke-policy`** と入力し、**「ポリシーの作成」（Create policy）** をクリック
+
+### 【変更】Step 4-2: cleanup 用ノートブックを Databricks にアップロードする / Upload cleanup notebook to Databricks
+
+**目的**: `cleanup` タスクで使用するノートブックを Databricks ワークスペースに配置する。このノートブックは **RDS 停止 → NAT Gateway 削除** の順で実行する。
+
+> **⚠️ 順番が重要 / Order matters:**
+> RDS 停止の API 呼出し（`boto3` → AWS API）はインターネット経由で行われるため、NAT Gateway が必要です。NAT Gateway を先に削除すると、RDS 停止の API 呼出しが失敗する可能性があります。必ず **RDS 停止 → NAT 削除** の順番を守ってください。
+
+1. Databricks UI → 左メニュー **「ワークスペース」（Workspace）** をクリック
+2. 適切なフォルダ（例: `/Workspace/northwind/operations/`）に移動する
+3. 新しいノートブックを作成し、名前を **`cleanup`** とする
+4. 以下のファイルの内容を貼り付ける:
+
+`notebooks_sprint2/story1-6/nb_06_cleanup.py`
+
+### 【変更】Step 4-3: Job に cleanup タスクを追加する / Add cleanup task to the Job
+
+**目的**: パイプライン最終タスクとして RDS 停止 + NAT Gateway 削除を追加する。
+
+1. Databricks UI → 左メニュー **「ジョブとパイプライン」（Jobs）** をクリック
+2. **`northwind_daily_pipeline`** をクリックして開く
+3. **「タスク」（Tasks）** タブで編集画面を開く
+
+4. **「タスクを追加」（Add task）** をクリックし、以下を設定する:
+
+| 設定項目 / Setting | 値 / Value |
+|---|---|
+| Task name | **`cleanup`** |
+| Type | **Notebook** |
+| Source | Workspace |
+| Path | `/Workspace/northwind/operations/cleanup` |
+| Cluster | Job Cluster（既存設定を使用） |
+| Depends on | `gold_aggregate` |
+
+> **重要 / IMPORTANT**: `cleanup` タスクは、パイプラインが **成功しても失敗しても** 実行されるように設定する必要があります。
+
+**失敗時にも実行する設定 / Run on failure setting:**
+
+1. `cleanup` タスクをクリックする
+2. 依存関係の設定で、**「Run if」** を **「All done」（すべて完了時）** に変更する
+
+### Step 4-4: 更新後のタスクフローを確認する / Verify the updated task flow
+
+設定後、タスクの依存関係図が以下のようになっていることを確認する:
+
+```
+bronze_ingest → silver_transform → gold_aggregate → cleanup
+```
+
+> **注意**: `cleanup` タスクは 1 つのノートブック内で **RDS 停止 → NAT Gateway 削除** を順番に実行します。
+
+**スクリーンショットを取得する / Take a screenshot**
+
+---
+
+## Phase 5: テスト計画 / Test Plan
+
+### 目的 / Purpose
+
+各コンポーネント（Lambda、EventBridge、パイプライン、Serverless）を段階的にテストし、全体の動作を確認する。
+
+Systematically test each component and verify end-to-end behavior.
+
+> **テスト実施順序**: Phase A（個別 Lambda）→ Phase B（EventBridge スケジュール）→ Phase C（パイプライン結合）→ Phase D（Serverless）の順で進めてください。Phase D は独立して実施可能です。
+
+---
+
+### Phase A: 個別 Lambda テスト（ユニットテスト） / Individual Lambda Tests (Unit Tests)
+
+> **ユニットテストとは**: 各 Lambda 関数が**単体で**正しく動作するかを確認するテストです。他のコンポーネント（EventBridge、Databricks）とは組み合わせず、Lambda だけを個別にテストします。
+>
+> **品質保証の内容**: 「各部品が単体で正しく機能すること」を保証します。
+
+#### テスト A-1: RDS 起動 Lambda / RDS start Lambda
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | RDS コンソールで `northwind-db` が **Stopped** であることを確認 | |
+| 2 | `northwind-rds-start` Lambda を手動実行 | **Succeeded** で `"starting"` が返ること |
+| 3 | RDS コンソールで状態を監視（10〜15分） | **Available** になること |
+
+#### テスト A-2: RDS 停止 Lambda / RDS stop Lambda
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | RDS コンソールで `northwind-db` が **Available** であることを確認 | |
+| 2 | `northwind-rds-stop` Lambda を手動実行 | **Succeeded** で `"stopping"` が返ること |
+| 3 | RDS コンソールで状態を監視（数分） | **Stopped** になること |
+
+#### テスト A-3: RDS 冪等性 / RDS idempotency
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | RDS が **Available** の状態で `northwind-rds-start` を実行 | **Succeeded** で `"already available"` メッセージ。エラーにならないこと |
+| 2 | RDS が **Stopped** の状態で `northwind-rds-stop` を実行 | **Succeeded** で `"already stopped"` メッセージ。エラーにならないこと |
+
+#### テスト A-4: NAT Gateway 削除 冪等性 / NAT delete idempotency
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | NAT Gateway が存在しないことを確認 | VPC コンソールで Available なし |
+| 2 | `northwind-nat-delete` Lambda を手動実行 | **Succeeded** で `"No NAT Gateways found to delete"` が返ること |
+
+---
+
+### Phase B: EventBridge スケジュールテスト / EventBridge Schedule Tests
+
+> **品質保証の内容**: EventBridge Scheduler が正しい時刻に正しい Lambda を呼び出せることを保証します。
+
+#### テスト B-1: NAT Gateway 削除スケジュール（安全ネット） / NAT delete schedule (safety net)
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | Lambda 手動実行で NAT Gateway を作成する | VPC コンソールで Available 確認 |
+| 2 | `northwind-nat-delete-schedule` の実行時刻を **5分後に一時変更** | |
+| 3 | 5分待つ | |
+| 4 | VPC コンソールで NAT Gateway を確認 | **Deleted** になっていること |
+| 5 | スケジュールを 02:00 JST（`cron(0 17 ? * * *)`）に戻す | |
+
+#### テスト B-2: RDS 停止スケジュール（安全ネット） / RDS stop schedule (safety net)
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | Lambda 手動実行で RDS を起動する | RDS コンソールで Available 確認 |
+| 2 | `northwind-rds-stop-schedule` の実行時刻を **5分後に一時変更** | |
+| 3 | 15分待つ（RDS 停止には数分かかるため余裕を持つ） | |
+| 4 | RDS コンソールで確認 | **Stopped** になっていること |
+| 5 | スケジュールを 02:00 JST（`cron(0 17 ? * * *)`）に戻す | |
+
+---
+
+### Phase C: パイプライン結合テスト / Pipeline Integration Tests
+
+> **結合テストとは**: 個別にテスト済みの部品（Lambda、EventBridge、Databricks）を**組み合わせて**、全体のワークフローが正しく連携するかを確認するテストです。
+>
+> **品質保証の内容**: 「部品同士が正しく連携し、全体のワークフローが期待通りに動くこと」を保証します。
+
+#### テスト C-1: パイプライン全体の結合テスト（正常系） / Full pipeline integration test (normal case)
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | **事前状態を確認** | |
+| | - VPC コンソール | NAT Gateway が Available なし |
+| | - RDS コンソール | `northwind-db` が Stopped |
+| 2 | `northwind-rds-start` Lambda を手動実行 | |
+| 3 | 10〜15分待つ | RDS が Available になること |
+| 4 | `northwind-nat-create` Lambda を手動実行 | |
+| 5 | 2〜3分待つ | NAT Gateway が Available になること |
+| 6 | Databricks UI で `northwind_daily_pipeline` を **今すぐ実行** | |
+| 7 | タスクの進行を監視 | |
+| | - `bronze_ingest` | → Succeeded |
+| | - `silver_transform` | → Succeeded |
+| | - `gold_aggregate` | → Succeeded |
+| | - `cleanup` | → Succeeded |
+| 8 | **事後状態を確認** | |
+| | - VPC コンソール | NAT Gateway が **Deleted** |
+| | - RDS コンソール | `northwind-db` が **Stopping → Stopped** |
+
+**スクリーンショット取得ポイント:**
+- 手順 1: 事前状態（NAT = なし、RDS = Stopped）
+- 手順 7: 全タスク Succeeded
+- 手順 8: 事後状態（NAT = Deleted、RDS = Stopped）
+
+#### テスト C-2: パイプライン失敗時にも cleanup が実行されるか（異常系） / Cleanup runs even on pipeline failure
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | RDS 起動 + NAT 作成（テスト C-1 の手順 1〜5 と同じ） | |
+| 2 | `bronze_ingest` ノートブックの先頭に `raise Exception("test failure")` を追加 | |
+| 3 | Databricks Job を **今すぐ実行** | |
+| 4 | タスクの進行を監視 | |
+| | - `bronze_ingest` | → **Failed** |
+| | - `silver_transform` | → Upstream failed（スキップ） |
+| | - `gold_aggregate` | → Upstream failed（スキップ） |
+| | - `cleanup`（Run if: All done） | → **Succeeded** ← ここが重要 |
+| 5 | 事後状態を確認 | NAT = **Deleted**、RDS = **Stopping/Stopped** |
+| 6 | **`raise Exception("test failure")` を必ず削除する** | |
+
+#### テスト C-3: cleanup 内の実行順序が正しいか / Cleanup execution order verification
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | テスト C-1 を実行する | |
+| 2 | cleanup タスクの **ログ出力** を確認する | |
+| 3 | ログの順序を確認 | 以下の順番で出力されていること |
+
+```
+期待されるログ出力 / Expected log output:
+  Step 1: RDS 停止 Lambda を呼び出し中...     ← 先にRDS停止
+  ✅ RDS 停止リクエスト成功
+  Step 2: NAT Gateway 削除 Lambda を呼び出し中... ← 後にNAT削除
+  ✅ NAT Gateway 削除成功
+```
+
+---
+
+### Phase D: Serverless テスト / Serverless Compute Tests
+
+> **品質保証の内容**: NAT Gateway・RDS が停止した状態でも、Serverless Compute で S3 上のデータ分析が可能であることを保証します。
+
+#### テスト D-1: Serverless Compute で S3 データを読めるか / Can Serverless Compute read S3 data?
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | **NAT Gateway も RDS も停止した状態** であることを確認 | |
+| 2 | Databricks UI で新しいノートブックを作成 | |
+| 3 | クラスター選択で **Serverless** を選ぶ | |
+| 4 | 以下のコードを実行: | |
+
+```python
+# S3上のGold層データを読む（NAT不要、RDS不要）
+df = spark.read.table("northwind_catalog.gold.daily_order_summary")
+display(df)
+```
+
+| 5 | 結果を確認 | データが表示されること。エラーにならないこと |
+
+**このテストが成功すれば、分析作業時に NAT Gateway も RDS も不要であることが証明されます。**
+
+#### テスト D-2: Serverless Compute で RDS に直接アクセスできるか（確認用） / Can Serverless access RDS directly? (exploratory)
+
+| 手順 | 操作 | 確認ポイント |
+| --- | --- | --- |
+| 1 | NAT Gateway 停止、RDS は **起動** した状態にする | |
+| 2 | Serverless ノートブックで以下を実行: | |
+
+```python
+df = spark.read.format("jdbc") \
+    .option("url", "jdbc:postgresql://<RDSエンドポイント>:5432/northwind") \
+    .option("dbtable", "orders") \
+    .option("user", "dbadmin") \
+    .option("password", "<パスワード>") \
+    .load()
+display(df)
+```
+
+| 3 | 結果を確認 | **成功 or 失敗を記録する**。失敗した場合は Serverless → VPC 間のネットワーク設定（NCC）が必要 |
+
+> このテストは「できるかどうかの確認」です。失敗しても問題ありません。
+
+---
+
+## 注意事項 / Notes
+
+| 項目 / Item | 内容 / Details |
+|------|------|
+| NAT Gateway 作成時間 / Creation time | 1〜3分。作成 Lambda のタイムアウトは5分 |
+| NAT Gateway 削除時間 / Deletion time | 5分を超える可能性あり。タイムアウトは **10分** |
+| RDS 起動時間 / RDS start time | 10〜15分。パイプライン開始の **15〜20分前** に起動すること |
+| RDS 停止時間 / RDS stop time | 数分。停止 Lambda のタイムアウトは1分（リクエスト送信のみ） |
+| RDS 7日間自動再起動 / RDS 7-day auto-restart | RDS は7日間停止し続けると AWS が自動再起動する。毎日停止スケジュールが動いていれば問題なし |
+| Elastic IP の上限 / EIP limit | リージョンあたり5個。不要な EIP は解放すること |
+| 冪等性 / Idempotency | 全4つの Lambda に冪等性チェックが組み込まれている |
+| cleanup の実行順序 / Cleanup order | **必ず RDS 停止 → NAT 削除の順番**。逆にすると RDS 停止 API が失敗する可能性あり |
+| 失敗時の cleanup / Cleanup on failure | `cleanup` を「All done」で設定することで、パイプライン失敗時にもリソースが停止・削除される |
+| S3 アクセス / S3 access | VPC Endpoint（Gateway 型）使用。NAT Gateway 不要 |
+| RDS アクセス / RDS access | 同じ VPC 内。NAT Gateway 不要（ただし RDS 自体が起動している必要あり） |
+| EventBridge Scheduler コスト | 月14百万回まで無料。事実上無料 |
+| boto3 read_timeout | Databricks から Lambda を同期呼出する際は `read_timeout` を900秒に延長 |
+| Serverless Compute | S3 上の Delta Lake データ分析なら NAT Gateway・RDS 不要。手動分析時の利便性向上 |
+
+---
+
+## 実施順序まとめ / Execution Order Summary
+
+```
+Phase 1: 既存 NAT Gateway の削除 / Remove existing NAT Gateway
+  └── Step 1-1 → 1-2 → 1-3 → 1-4
+        ↓
+Phase 2: Lambda 関数の作成（4つ）/ Create Lambda functions (4)
+  └── Step 2-1（IAMポリシー+ロール）
+      → Step 2-2（NAT作成Lambda）→ Step 2-3（NAT削除Lambda）
+      → Step 2-4（RDS起動Lambda）→ Step 2-5（RDS停止Lambda）  【追加】
+      → Step 2-6（NAT作成テスト）→ Step 2-7（NAT削除テスト）→ Step 2-8（結果確認）
+        ↓
+Phase 3: EventBridge Scheduler の設定（4つ）/ Configure EventBridge Schedules (4)
+  └── Step 3-1（RDS起動スケジュール 05:45）  【追加】
+      → Step 3-2（NAT作成スケジュール 06:00）
+      → Step 3-3（NAT削除スケジュール 02:00 安全ネット）  【追加】
+      → Step 3-4（RDS停止スケジュール 02:00 安全ネット）  【追加】
+      → Step 3-5（Databricksスケジュール調整 06:10）
+        ↓
+Phase 4: Databricks Workflows Job の更新 / Update Workflows Job
+  └── Step 4-1（権限追加）→ Step 4-2（cleanupノートブック配置）【変更】
+      → Step 4-3（cleanupタスク追加）【変更】→ Step 4-4（フロー確認）
+        ↓
+Phase 5: テスト / Tests
+  └── Phase A: 個別 Lambda テスト（ユニットテスト）
+        A-1（RDS起動）→ A-2（RDS停止）→ A-3（RDS冪等性）→ A-4（NAT削除冪等性）
+            ↓
+      Phase B: EventBridge スケジュールテスト
+        B-1（NAT 02:00削除）→ B-2（RDS 02:00停止）
+            ↓
+      Phase C: パイプライン結合テスト
+        C-1（正常系）→ C-2（異常系：失敗時cleanup）→ C-3（ログ順序確認）
+            ↓
+      Phase D: Serverless テスト（独立実施可）
+        D-1（S3データ読み取り）→ D-2（RDS直接アクセス確認）
+```
+
+---
+
+## 変更履歴 / Change History
+
+| 日付 / Date | 内容 / Details |
+|------|------|
+| 2026-03-23 | 初版作成。Sprint 2 スコープとして Story 1-6 の実装手順を策定 / Initial version. Story 1-6 implementation guide for Sprint 2 |
+| 2026-03-23 | 実現可能性評価に基づく改修: EventBridge Scheduler による NAT Gateway 事前作成方式に変更、冪等性チェック追加、Lambda タイムアウト修正、boto3 read_timeout 設定追加 / Revised based on feasibility assessment |
+| 2026-03-27 | Step 3-1 の IAM ロール手動作成を廃止し、EventBridge Scheduler コンソールによるロール自動生成に変更 / Removed manual IAM role creation in Step 3-1 |
+| 2026-03-27 | Phase 5 を要望別テスト計画に全面改訂 / Replaced Phase 5 with requirement-based test plan |
+| 2026-04-XX | 【追加】RDS 定時起動・停止機能を追加（Lambda 2つ + EventBridge Schedule 2つ）/ Added RDS scheduled start/stop (2 Lambdas + 2 EventBridge Schedules) |
+| 2026-04-XX | 【追加】NAT Gateway・RDS の 02:00 JST 自動停止・削除スケジュールを追加（安全ネット）/ Added 02:00 JST safety-net auto-shutdown schedules for NAT Gateway and RDS |
+| 2026-04-XX | 【変更】パイプライン最終タスクを `nat_delete` → `cleanup`（RDS停止 + NAT削除）に変更。実行順序: RDS停止→NAT削除（NAT経由のAPI呼出しが必要なため）/ Changed final pipeline task from `nat_delete` to `cleanup` (RDS stop + NAT delete). Order: RDS stop → NAT delete (API calls require NAT) |
+| 2026-04-XX | 【追加】IAM ポリシーに RDS 管理権限（rds:StartDBInstance, rds:StopDBInstance, rds:DescribeDBInstances）を追加 / Added RDS management permissions to IAM policy |
+| 2026-04-XX | 【追加】Serverless Compute テスト（Phase D）を追加。S3 上のデータ分析が NAT・RDS 不要で可能かを検証 / Added Serverless Compute tests (Phase D) to verify S3 analysis without NAT/RDS |
+| 2026-04-XX | 【追加】概要セクションにコスト比較表を追加（NAT + RDS 合計: $66/月 → $3.3/月、約95%削減）/ Added cost comparison table to overview (NAT + RDS total: $66/mo → $3.3/mo, ~95% savings) |
