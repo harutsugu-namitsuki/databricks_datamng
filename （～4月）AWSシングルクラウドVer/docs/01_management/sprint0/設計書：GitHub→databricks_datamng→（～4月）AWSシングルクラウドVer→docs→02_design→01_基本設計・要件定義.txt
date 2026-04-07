@@ -1,0 +1,1 @@
+GitHub\databricks_datamng\（～4月）AWSシングルクラウドVer\docs\02_design\01_基本設計・要件定義
