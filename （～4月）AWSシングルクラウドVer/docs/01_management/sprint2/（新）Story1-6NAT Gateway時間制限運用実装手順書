@@ -54,15 +54,15 @@ NAT Gateway（ナットゲートウェイ）とは、プライベートサブネ
 ┌──────────────────────────────────────────────────────────────┐
 │  Amazon EventBridge Scheduler                                │
 │                                                              │
-│  05:45 JST (UTC 20:45)                                       │
+│  20:45 JST                                                   │
 │     → northwind-rds-start Lambda を実行                       │
 │     → RDS 起動（約10〜15分で完了）                              │
 │                                                              │
-│  06:00 JST (UTC 21:00)                                       │
+│  20:55 JST                                                   │
 │     → northwind-nat-create Lambda を実行                      │
-│     → NAT Gateway 作成（約3分で完了）                          │
+│     → NAT Gateway 作成（約3分で完了、21:00までに完了）          │
 │                                                              │
-│  02:00 JST (UTC 17:00) ← 安全ネット / Safety net              │
+│  02:00 JST ← 安全ネット / Safety net                          │
 │     → northwind-nat-delete Lambda を実行                      │
 │     → northwind-rds-stop Lambda を実行                        │
 │     → 消し忘れ防止（既に停止済みなら何もしない）                  │
@@ -70,7 +70,7 @@ NAT Gateway（ナットゲートウェイ）とは、プライベートサブネ
                          ↓  10分後 / 10 min later
 ┌──────────────────────────────────────────────────────────────┐
 │  Databricks Workflows Job: northwind_daily_pipeline          │
-│  スケジュール / Schedule: 06:10 JST                            │
+│  スケジュール / Schedule: 21:00 JST                            │
 │  （NAT Gateway・RDS が既に Available のため、実行可能）          │
 │                                                              │
 │  ┌──────────────┐                                            │
@@ -411,7 +411,43 @@ Step 2-4 と同様の手順で、以下の設定で作成する:
 
 `notebooks_sprint2/story1-6/nb_05_rds_stop_lambda.py`
 
-### Step 2-6: Lambda 関数のテスト（NAT Gateway 作成） / Test Lambda Function (NAT Create)
+### 【追加】Step 2-6: Lambda 関数のテスト（RDS 起動） / Test Lambda Function (RDS Start)
+
+**目的**: RDS インスタンスが正しく起動されることを確認する。
+
+1. RDS コンソールで `northwind-db` が **Stopped** であることを確認する
+   - RDS コンソール → データベース → `northwind-db` のステータスを確認
+2. Lambda コンソールで **`northwind-rds-start`** を開く
+3. **「テスト」（Test）** タブをクリックする
+4. テストイベント名（Event name）に **`test-start`** と入力する
+5. イベント JSON はデフォルトの `{}` のまま、**「テスト」（Test）** ボタンをクリックする
+6. 実行結果が **Succeeded**（緑色）になることを確認する
+7. レスポンスに以下が含まれることを確認する:
+   - `"statusCode": 200`
+   - `"message": "RDS start initiated"`
+   - `"status": "starting"`
+8. RDS コンソールで状態を監視し（10〜15分）、**Available** になることを確認する
+
+> **冪等性の確認 / Verify Idempotency**: RDS が **Available** の状態でテストボタンを **もう一度クリック** して、レスポンスに `"message": "RDS already available (idempotent)"` が含まれることを確認してください。
+
+### 【追加】Step 2-7: Lambda 関数のテスト（RDS 停止） / Test Lambda Function (RDS Stop)
+
+**目的**: RDS インスタンスが正しく停止されることを確認する。
+
+1. RDS コンソールで `northwind-db` が **Available** であることを確認する（Step 2-6 で Available になっているはず）
+2. Lambda コンソールで **`northwind-rds-stop`** を開く
+3. **「テスト」（Test）** タブで、テストイベント名に **`test-stop`** と入力する
+4. イベント JSON はデフォルトの `{}` のまま、**「テスト」（Test）** ボタンをクリックする
+5. 実行結果が **Succeeded**（緑色）になることを確認する
+6. レスポンスに以下が含まれることを確認する:
+   - `"statusCode": 200`
+   - `"message": "RDS stop initiated"`
+   - `"status": "stopping"`
+7. RDS コンソールで状態を監視し（数分）、**Stopped** になることを確認する
+
+> **冪等性の確認 / Verify Idempotency**: RDS が **Stopped** の状態でテストボタンを **もう一度クリック** して、レスポンスに `"message": "RDS already stopped (idempotent)"` が含まれることを確認してください。
+
+### Step 2-8: Lambda 関数のテスト（NAT Gateway 作成） / Test Lambda Function (NAT Create)
 
 **目的**: NAT Gateway が正しく作成されることを確認する。
 
@@ -427,17 +463,21 @@ Step 2-4 と同様の手順で、以下の設定で作成する:
 
 > **冪等性の確認 / Verify Idempotency**: テストボタンを **もう一度クリック** して、2回目のレスポンスに `"message": "NAT Gateway already exists (idempotent)"` が含まれることを確認してください。
 
-### Step 2-7: Lambda 関数のテスト（NAT Gateway 削除） / Test Lambda Function (NAT Delete)
+### Step 2-9: Lambda 関数のテスト（NAT Gateway 削除） / Test Lambda Function (NAT Delete)
 
 1. Lambda コンソールで **`northwind-nat-delete`** を開く
 2. **「テスト」（Test）** タブで、イベント JSON を `{}` のまま **「テスト」（Test）** をクリックする
 3. 実行結果が **Succeeded**（緑色）になることを確認する
 4. レスポンスに `"statusCode": 200` が含まれることを確認する
 
-### Step 2-8: AWS コンソールで結果を確認する / Verify results in AWS Console
+> **冪等性の確認 / Verify Idempotency**: NAT Gateway が存在しない状態でテストボタンを **もう一度クリック** して、レスポンスに `"No NAT Gateways found to delete"` が含まれることを確認してください。エラーにならないこと（冪等）。
+
+### Step 2-10: AWS コンソールで結果を確認する / Verify results in AWS Console
 
 1. **VPC** → **NAT ゲートウェイ（NAT gateways）** を開く
-2. Step 2-6 で作成された NAT Gateway が **Deleted** 状態になっていることを確認する
+2. Step 2-8 で作成された NAT Gateway が **Deleted** 状態になっていることを確認する
+3. **RDS** → **データベース** を開く
+4. `northwind-db` が **Stopped** 状態になっていることを確認する（Step 2-7 で停止済み）
 
 ---
 
@@ -459,7 +499,7 @@ Configure EventBridge schedules to automatically start RDS and create NAT Gatewa
 
 ### 【追加】Step 3-1: RDS 起動スケジュールを作成する / Create RDS Start Schedule
 
-**目的**: 毎日 05:45 JST に RDS 起動 Lambda を自動実行する。RDS は起動に 10〜15分かかるため、NAT Gateway 作成（06:00）より前に起動する。
+**目的**: 毎日 20:45 JST に RDS 起動 Lambda を自動実行する。RDS は起動に 10〜15分かかるため、NAT Gateway 作成（20:55）より前に起動する。
 
 1. AWS Management Console → 検索バーに **`EventBridge`** と入力 → **Amazon EventBridge** を開く
 2. 左メニューから **「スケジュール」（Schedules）** をクリックする
@@ -473,9 +513,9 @@ Configure EventBridge schedules to automatically start RDS and create NAT Gatewa
 | スケジュールグループ / Schedule group | **default** | デフォルトグループを使用 |
 | スケジュールの種類 / Schedule type | **定期的なスケジュール / Recurring schedule** | 毎日繰り返し実行 |
 | スケジュールの種類 / Schedule type | **cron ベースのスケジュール / Cron-based schedule** | cron 式で指定 |
-| cron 式 / Cron expression | **`cron(45 20 ? * * *)`** | UTC 20:45 = JST 05:45 |
+| cron 式 / Cron expression | **`cron(45 20 ? * * *)`** | JST 20:45（タイムゾーン: Asia/Tokyo） |
 | フレキシブルタイムウィンドウ / Flexible time window | **オフ / Off** | 正確な時刻に実行する |
-| タイムゾーン / Timezone | **UTC** | cron 式は UTC で指定済み |
+| タイムゾーン / Timezone | **Asia/Tokyo (UTC+09:00)** | cron 式は日本時間で指定 |
 
 5. **「次へ」（Next）** をクリックする
 
@@ -509,19 +549,19 @@ Configure EventBridge schedules to automatically start RDS and create NAT Gatewa
 
 ### Step 3-2: NAT Gateway 作成スケジュールを作成する / Create NAT Gateway Create Schedule
 
-**目的**: 毎日 06:00 JST に NAT Gateway 作成 Lambda を自動実行するスケジュールを作成する。
+**目的**: 毎日 20:55 JST に NAT Gateway 作成 Lambda を自動実行するスケジュールを作成する。Databricks Job（21:00 JST）の5分前に実行し、NAT Gateway 作成（約3分）が間に合うようにする。
 
 Step 3-1 と同様の手順で、以下の設定で作成する:
 
 | 設定項目 / Setting | 値 / Value |
 |---|---|
 | スケジュール名 / Schedule name | **`northwind-nat-create-schedule`** |
-| cron 式 / Cron expression | **`cron(0 21 ? * * *)`** （UTC 21:00 = JST 06:00） |
+| cron 式 / Cron expression | **`cron(55 20 ? * * *)`** （JST 20:55、タイムゾーン: Asia/Tokyo） |
 | ターゲット Lambda | **`northwind-nat-create`** |
 | 実行ロール / Role name | **`northwind-eventbridge-nat-create-role`**（新規作成） |
 
 > **cron 式の読み方 / How to read the cron expression:**
-> `cron(0 21 ? * * *)` = 「毎日 UTC 21:00（= JST 06:00）に実行する」
+> `cron(55 20 ? * * *)` = 「毎日 20:55 JST に実行する」（タイムゾーンが Asia/Tokyo に設定されているため、cron 式の時刻はそのまま日本時間）
 
 ### 【追加】Step 3-3: NAT Gateway 02:00 自動削除スケジュールを作成する（安全ネット） / Create NAT Gateway Safety-Net Delete Schedule
 
@@ -530,7 +570,7 @@ Step 3-1 と同様の手順で、以下の設定で作成する:
 | 設定項目 / Setting | 値 / Value |
 |---|---|
 | スケジュール名 / Schedule name | **`northwind-nat-delete-schedule`** |
-| cron 式 / Cron expression | **`cron(0 17 ? * * *)`** （UTC 17:00 = JST 02:00） |
+| cron 式 / Cron expression | **`cron(0 2 ? * * *)`** （JST 02:00、タイムゾーン: Asia/Tokyo） |
 | ターゲット Lambda | **`northwind-nat-delete`** |
 | 実行ロール / Role name | **`northwind-eventbridge-nat-delete-role`**（新規作成） |
 
@@ -541,7 +581,7 @@ Step 3-1 と同様の手順で、以下の設定で作成する:
 | 設定項目 / Setting | 値 / Value |
 |---|---|
 | スケジュール名 / Schedule name | **`northwind-rds-stop-schedule`** |
-| cron 式 / Cron expression | **`cron(0 17 ? * * *)`** （UTC 17:00 = JST 02:00） |
+| cron 式 / Cron expression | **`cron(0 2 ? * * *)`** （JST 02:00、タイムゾーン: Asia/Tokyo） |
 | ターゲット Lambda | **`northwind-rds-stop`** |
 | 実行ロール / Role name | **`northwind-eventbridge-rds-stop-role`**（新規作成） |
 
@@ -550,13 +590,13 @@ Step 3-1 と同様の手順で、以下の設定で作成する:
 **目的**: Databricks Job が RDS 起動・NAT Gateway 作成の **十分後** に開始するようにする。
 
 | EventBridge (RDS 起動) | EventBridge (NAT 作成) | Databricks Job | 差分 |
-|---|---|---|---|
-| 05:45 JST | 06:00 JST | **06:10 JST** | RDS起動から25分、NAT作成から10分 |
+| --- | --- | --- | --- |
+| 20:45 JST | 20:55 JST | **21:00 JST** | RDS起動から15分、NAT作成から5分（NAT完了は20:58頃） |
 
 1. Databricks UI → 左メニュー **「ジョブとパイプライン」（Jobs）** をクリック
 2. **`northwind_daily_pipeline`** をクリックして開く
 3. **「スケジュール」（Schedule）** セクションを確認する
-4. 開始時刻を **06:10 JST** に設定する
+4. 開始時刻が **21:00 JST** になっていることを確認する（既に設定済み）
 
 **スクリーンショットを取得する / Take a screenshot**
 
@@ -645,45 +685,9 @@ bronze_ingest → silver_transform → gold_aggregate → cleanup
 
 Systematically test each component and verify end-to-end behavior.
 
-> **テスト実施順序**: Phase A（個別 Lambda）→ Phase B（EventBridge スケジュール）→ Phase C（パイプライン結合）→ Phase D（Serverless）の順で進めてください。Phase D は独立して実施可能です。
-
----
-
-### Phase A: 個別 Lambda テスト（ユニットテスト） / Individual Lambda Tests (Unit Tests)
-
-> **ユニットテストとは**: 各 Lambda 関数が**単体で**正しく動作するかを確認するテストです。他のコンポーネント（EventBridge、Databricks）とは組み合わせず、Lambda だけを個別にテストします。
+> **テスト実施順序**: Phase B（EventBridge スケジュール）→ Phase C（パイプライン結合）→ Phase D（Serverless）の順で進めてください。Phase D は独立して実施可能です。
 >
-> **品質保証の内容**: 「各部品が単体で正しく機能すること」を保証します。
-
-#### テスト A-1: RDS 起動 Lambda / RDS start Lambda
-
-| 手順 | 操作 | 確認ポイント |
-| --- | --- | --- |
-| 1 | RDS コンソールで `northwind-db` が **Stopped** であることを確認 | |
-| 2 | `northwind-rds-start` Lambda を手動実行 | **Succeeded** で `"starting"` が返ること |
-| 3 | RDS コンソールで状態を監視（10〜15分） | **Available** になること |
-
-#### テスト A-2: RDS 停止 Lambda / RDS stop Lambda
-
-| 手順 | 操作 | 確認ポイント |
-| --- | --- | --- |
-| 1 | RDS コンソールで `northwind-db` が **Available** であることを確認 | |
-| 2 | `northwind-rds-stop` Lambda を手動実行 | **Succeeded** で `"stopping"` が返ること |
-| 3 | RDS コンソールで状態を監視（数分） | **Stopped** になること |
-
-#### テスト A-3: RDS 冪等性 / RDS idempotency
-
-| 手順 | 操作 | 確認ポイント |
-| --- | --- | --- |
-| 1 | RDS が **Available** の状態で `northwind-rds-start` を実行 | **Succeeded** で `"already available"` メッセージ。エラーにならないこと |
-| 2 | RDS が **Stopped** の状態で `northwind-rds-stop` を実行 | **Succeeded** で `"already stopped"` メッセージ。エラーにならないこと |
-
-#### テスト A-4: NAT Gateway 削除 冪等性 / NAT delete idempotency
-
-| 手順 | 操作 | 確認ポイント |
-| --- | --- | --- |
-| 1 | NAT Gateway が存在しないことを確認 | VPC コンソールで Available なし |
-| 2 | `northwind-nat-delete` Lambda を手動実行 | **Succeeded** で `"No NAT Gateways found to delete"` が返ること |
+> **注**: 個別 Lambda の単体テスト（旧 Phase A）は Phase 2（Step 2-6〜2-9）に統合済みです。Lambda 作成直後にテストを実施することで、問題の早期発見につなげます。
 
 ---
 
@@ -699,7 +703,7 @@ Systematically test each component and verify end-to-end behavior.
 | 2 | `northwind-nat-delete-schedule` の実行時刻を **5分後に一時変更** | |
 | 3 | 5分待つ | |
 | 4 | VPC コンソールで NAT Gateway を確認 | **Deleted** になっていること |
-| 5 | スケジュールを 02:00 JST（`cron(0 17 ? * * *)`）に戻す | |
+| 5 | スケジュールを 02:00 JST（`cron(0 2 ? * * *)`）に戻す | |
 
 #### テスト B-2: RDS 停止スケジュール（安全ネット） / RDS stop schedule (safety net)
 
@@ -709,7 +713,7 @@ Systematically test each component and verify end-to-end behavior.
 | 2 | `northwind-rds-stop-schedule` の実行時刻を **5分後に一時変更** | |
 | 3 | 15分待つ（RDS 停止には数分かかるため余裕を持つ） | |
 | 4 | RDS コンソールで確認 | **Stopped** になっていること |
-| 5 | スケジュールを 02:00 JST（`cron(0 17 ? * * *)`）に戻す | |
+| 5 | スケジュールを 02:00 JST（`cron(0 2 ? * * *)`）に戻す | |
 
 ---
 
@@ -851,28 +855,26 @@ display(df)
 Phase 1: 既存 NAT Gateway の削除 / Remove existing NAT Gateway
   └── Step 1-1 → 1-2 → 1-3 → 1-4
         ↓
-Phase 2: Lambda 関数の作成（4つ）/ Create Lambda functions (4)
+Phase 2: Lambda 関数の作成とテスト（4つ）/ Create & Test Lambda functions (4)
   └── Step 2-1（IAMポリシー+ロール）
       → Step 2-2（NAT作成Lambda）→ Step 2-3（NAT削除Lambda）
-      → Step 2-4（RDS起動Lambda）→ Step 2-5（RDS停止Lambda）  【追加】
-      → Step 2-6（NAT作成テスト）→ Step 2-7（NAT削除テスト）→ Step 2-8（結果確認）
+      → Step 2-4（RDS起動Lambda）→ Step 2-5（RDS停止Lambda）
+      → Step 2-6（RDS起動テスト）→ Step 2-7（RDS停止テスト）  【追加：単体テストを統合】
+      → Step 2-8（NAT作成テスト）→ Step 2-9（NAT削除テスト）→ Step 2-10（結果確認）
         ↓
 Phase 3: EventBridge Scheduler の設定（4つ）/ Configure EventBridge Schedules (4)
-  └── Step 3-1（RDS起動スケジュール 05:45）  【追加】
-      → Step 3-2（NAT作成スケジュール 06:00）
-      → Step 3-3（NAT削除スケジュール 02:00 安全ネット）  【追加】
-      → Step 3-4（RDS停止スケジュール 02:00 安全ネット）  【追加】
-      → Step 3-5（Databricksスケジュール調整 06:10）
+  └── Step 3-1（RDS起動スケジュール 20:45 JST）
+      → Step 3-2（NAT作成スケジュール 20:55 JST）
+      → Step 3-3（NAT削除スケジュール 02:00 JST 安全ネット）
+      → Step 3-4（RDS停止スケジュール 02:00 JST 安全ネット）
+      → Step 3-5（Databricksスケジュール確認 21:00 JST）
         ↓
 Phase 4: Databricks Workflows Job の更新 / Update Workflows Job
-  └── Step 4-1（権限追加）→ Step 4-2（cleanupノートブック配置）【変更】
-      → Step 4-3（cleanupタスク追加）【変更】→ Step 4-4（フロー確認）
+  └── Step 4-1（権限追加）→ Step 4-2（cleanupノートブック配置）
+      → Step 4-3（cleanupタスク追加）→ Step 4-4（フロー確認）
         ↓
-Phase 5: テスト / Tests
-  └── Phase A: 個別 Lambda テスト（ユニットテスト）
-        A-1（RDS起動）→ A-2（RDS停止）→ A-3（RDS冪等性）→ A-4（NAT削除冪等性）
-            ↓
-      Phase B: EventBridge スケジュールテスト
+Phase 5: テスト / Tests  ※個別 Lambda テスト（旧Phase A）は Phase 2 に統合済み
+  └── Phase B: EventBridge スケジュールテスト
         B-1（NAT 02:00削除）→ B-2（RDS 02:00停止）
             ↓
       Phase C: パイプライン結合テスト
@@ -898,3 +900,5 @@ Phase 5: テスト / Tests
 | 2026-04-XX | 【追加】IAM ポリシーに RDS 管理権限（rds:StartDBInstance, rds:StopDBInstance, rds:DescribeDBInstances）を追加 / Added RDS management permissions to IAM policy |
 | 2026-04-XX | 【追加】Serverless Compute テスト（Phase D）を追加。S3 上のデータ分析が NAT・RDS 不要で可能かを検証 / Added Serverless Compute tests (Phase D) to verify S3 analysis without NAT/RDS |
 | 2026-04-XX | 【追加】概要セクションにコスト比較表を追加（NAT + RDS 合計: $66/月 → $3.3/月、約95%削減）/ Added cost comparison table to overview (NAT + RDS total: $66/mo → $3.3/mo, ~95% savings) |
+| 2026-04-08 | 【修正】EventBridge Scheduler のタイムゾーンを UTC → **Asia/Tokyo** に統一。cron 式は JST 直接指定に変更（RDS起動 `cron(45 20)`、NAT作成 `cron(55 20)`、安全ネット `cron(0 2)`）。UTC 変換が不要になり、時刻の読み間違いを防止 |
+| 2026-04-08 | 【整理】個別 Lambda 単体テスト（旧 Phase A）を Phase 2（Step 2-6〜2-9）に統合。NAT・RDS ともに Lambda 作成直後にテストを実施する一貫した構成に変更 / Consolidated individual Lambda unit tests (former Phase A) into Phase 2 (Steps 2-6 to 2-9). Both NAT and RDS now follow the same pattern: test immediately after creation |

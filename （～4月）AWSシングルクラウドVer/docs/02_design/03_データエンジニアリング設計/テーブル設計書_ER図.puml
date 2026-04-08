@@ -1,0 +1,175 @@
+@startuml テーブル設計書_ER図
+
+' ── スタイル設定 ───────────────────────────────────
+skinparam linetype ortho
+skinparam entity {
+    BackgroundColor White
+    BorderColor #555555
+    FontSize 11
+    AttributeFontSize 10
+}
+hide circle
+hide methods
+
+title Northwind Data Lakehouse — ER図（Bronze層）
+
+' ── マスタ系 ──────────────────────────────────────
+
+entity "categories\n（カテゴリマスタ）" as categories {
+    * category_id    : smallint     <<PK>>
+    --
+    category_name    : varchar(15)
+    description      : text
+    picture          : bytea
+}
+
+entity "suppliers\n（仕入先マスタ）" as suppliers {
+    * supplier_id    : smallint     <<PK>>
+    --
+    company_name     : varchar(40)
+    contact_name     : varchar(30)
+    country          : varchar(15)
+    phone            : varchar(24)
+    homepage         : varchar(100)
+}
+
+entity "products\n（商品マスタ）" as products {
+    * product_id         : smallint    <<PK>>
+    --
+    product_name         : varchar(40)
+    supplier_id          : smallint    <<FK>>
+    category_id          : smallint    <<FK>>
+    quantity_per_unit    : varchar(20)
+    unit_price           : real
+    units_in_stock       : smallint
+    units_on_order       : smallint
+    reorder_level        : smallint
+    discontinued         : integer
+}
+
+entity "customers\n（顧客マスタ）" as customers {
+    * customer_id    : varchar(5)   <<PK>>
+    --
+    company_name     : varchar(40)
+    contact_name     : varchar(30)
+    address          : varchar(60)
+    city             : varchar(15)
+    country          : varchar(15)
+    phone            : varchar(24)
+    fax              : varchar(24)
+}
+
+entity "employees\n（従業員マスタ）" as employees {
+    * employee_id        : smallint     <<PK>>
+    --
+    last_name            : varchar(20)
+    first_name           : varchar(10)
+    title                : varchar(30)
+    title_of_courtesy    : varchar(25)
+    birth_date           : date
+    hire_date            : date
+    address              : varchar(60)
+    home_phone           : varchar(24)
+    extension            : varchar(4)
+    notes                : text
+    reports_to           : smallint     <<FK>>
+    photo_path           : varchar(255)
+}
+
+entity "shippers\n（配送業者マスタ）" as shippers {
+    * shipper_id     : smallint     <<PK>>
+    --
+    company_name     : varchar(40)
+    phone            : varchar(24)
+}
+
+entity "region\n（地域マスタ）" as region {
+    * region_id          : smallint     <<PK>>
+    --
+    region_description   : varchar(60)
+}
+
+entity "territories\n（テリトリマスタ）" as territories {
+    * territory_id           : varchar(20)  <<PK>>
+    --
+    territory_description    : varchar(50)
+    region_id                : smallint     <<FK>>
+}
+
+entity "us_states\n（米国州マスタ）" as us_states {
+    * state_id       : smallint     <<PK>>
+    --
+    state_name       : varchar(100)
+    state_abbr       : varchar(2)
+    state_region     : smallint
+}
+
+' ── トランザクション系 ─────────────────────────────
+
+entity "orders\n（受注データ）" as orders {
+    * order_id           : smallint     <<PK>>
+    --
+    customer_id          : varchar(5)   <<FK>>
+    employee_id          : smallint     <<FK>>
+    order_date           : date
+    required_date        : date
+    shipped_date         : date
+    ship_via             : smallint     <<FK>>
+    freight              : real
+    ship_name            : varchar(40)
+    ship_address         : varchar(60)
+    ship_city            : varchar(15)
+    ship_region          : varchar(15)
+    ship_postal_code     : varchar(10)
+    ship_country         : varchar(15)
+}
+
+entity "order_details\n（受注明細）" as order_details {
+    * order_id       : smallint     <<PK, FK>>
+    * product_id     : smallint     <<PK, FK>>
+    --
+    unit_price       : real
+    quantity         : smallint
+    discount         : real
+}
+
+' ── 関連テーブル ───────────────────────────────────
+
+entity "employee_territories\n（従業員テリトリ関連）" as employee_territories {
+    * employee_id    : smallint     <<PK, FK>>
+    * territory_id   : varchar(20)  <<PK, FK>>
+}
+
+entity "customer_demographics\n（顧客デモグラフィクス）" as customer_demographics {
+    * customer_type_id   : varchar(5)  <<PK>>
+    --
+    customer_desc        : text
+}
+
+entity "customer_customer_demo\n（顧客デモ関連）" as customer_customer_demo {
+    * customer_id        : varchar(5)  <<PK, FK>>
+    * customer_type_id   : varchar(5)  <<PK, FK>>
+}
+
+' ── リレーション ───────────────────────────────────
+
+categories              ||--o{ products              : ""
+suppliers               ||--o{ products              : ""
+
+customers               ||--o{ orders                : ""
+employees               ||--o{ orders                : ""
+shippers                ||--o{ orders                : ""
+
+orders                  ||--o{ order_details         : ""
+products                ||--o{ order_details         : ""
+
+region                  ||--o{ territories           : ""
+territories             ||--o{ employee_territories  : ""
+employees               ||--o{ employee_territories  : ""
+
+employees               }o--o| employees             : "reports to"
+
+customers               ||--o{ customer_customer_demo    : ""
+customer_demographics   ||--o{ customer_customer_demo    : ""
+
+@enduml
