@@ -1,25 +1,3 @@
-手順書を精査しました。以下が現状の過不足です。
-
----
-
-## 手順書に入っている / 入っていないの一覧
-
-| # | 要望 | 手順書に入っているか | 状態 |
-|---|---|---|---|
-| 1 | NAT Gateway 02:00自動削除（安全ネット） | ❌ **テスト計画にはあるが、作成手順がない** | EventBridge Schedule `northwind-nat-delete-schedule` を作る手順が欠落 |
-| 2 | RDS定時起動・定時停止 | ❌ **テスト計画にはあるが、作成手順がない** | RDS用Lambda 2つ、EventBridge Schedule 2つ、IAMポリシー追加の手順が全て欠落 |
-| 3 | RDS 02:00自動停止（安全ネット） | ❌ **テスト計画にはあるが、作成手順がない** | 要望1と同様 |
-| 4 | パイプラインのcleanupタスクでRDS停止+NAT削除（選択肢A） | ❌ **nat_deleteのみ。RDS停止が含まれていない** | ノートブックのコード、タスク名、IAM権限すべてNATのみ |
-| 5 | Serverless Computeでの分析確認 | ✅ **テスト計画Phase Dに入っている** | OK |
-
-**つまり、テスト計画は書かれているが、テスト対象の「実装手順」が欠落しています。**
-
----
-
-以下、不足分を追加した改訂版手順書を出力します。変更箇所には `【追加】` マークを付けています。
-
----
-
 # NAT Gateway 時間制限運用 実施手順書 / NAT Gateway Time-Limited Operation Guide（Story 1-6 / Sprint 2）
 
 ## 概要 / Overview
@@ -104,9 +82,17 @@ NAT Gateway（ナットゲートウェイ）とは、プライベートサブネ
 
 | ノートブック / Notebook | 用途 / Purpose |
 |------------|------|
-| `notebooks_sprint2/story1-6/nb_01_nat_create_lambda.py` | NAT Gateway 作成用 Lambda 関数コード / Lambda function code to create NAT Gateway |
-| `notebooks_sprint2/story1-6/nb_02_nat_delete_lambda.py` | NAT Gateway 削除用 Lambda 関数コード / Lambda function code to delete NAT Gateway |
-| `notebooks_sprint2/story1-6/nb_03_nat_verify.py` | 動作確認用ノートブック（Databricks上で実行） / Verification notebook (run on Databricks) |
+| `notebooks_sprint2/story1-6/nb_01_nat_create_lambda.py` | NAT Gateway 作成用 Lambda 関数コード（Step 2-2） |
+| `notebooks_sprint2/story1-6/nb_02_nat_delete_lambda.py` | NAT Gateway 削除用 Lambda 関数コード（Step 2-3） |
+| `notebooks_sprint2/story1-6/nb_03_nat_verify.py` | 動作確認用ノートブック（Databricks 上で実行） |
+| `notebooks_sprint2/story1-6/nb_04_rds_start_lambda.py` | RDS 起動用 Lambda 関数コード（Step 2-4） |
+| `notebooks_sprint2/story1-6/nb_05_rds_stop_lambda.py` | RDS 停止用 Lambda 関数コード（Step 2-5） |
+| `notebooks_sprint2/story1-6/nb_06_cleanup.py` | cleanup タスク用ノートブック（Step 4-2）。サービスクレデンシャル経由で Lambda を呼出 |
+| `notebooks_sprint2/story1-6/iam_policy_nat_gateway_manager.json` | Lambda 用 IAM 許可ポリシー（NAT + RDS 管理権限）（Step 2-1a） |
+| `notebooks_sprint2/story1-6/iam_policy_uc_lambda_invoke.json` | UC サービスクレデンシャル用 IAM 許可ポリシー（Lambda Invoke + STS）（Step 4-1a） |
+| `notebooks_sprint2/story1-6/iam_trust_policy_uc_lambda_invoke_initial.json` | UC サービスクレデンシャル用 IAM 初期信頼ポリシー（Step 4-1b で使用） |
+| `notebooks_sprint2/story1-6/iam_trust_policy_uc_lambda_invoke.json` | UC サービスクレデンシャル用 IAM 最終信頼ポリシー（Step 4-1d で編集・適用） |
+| `notebooks_sprint2/story1-6/sql_4-1c_create_service_credential.sql` | サービスクレデンシャル作成 SQL（Step 4-1c） |
 
 ---
 
@@ -610,18 +596,151 @@ Step 3-1 と同様の手順で、以下の設定で作成する:
 
 Add a cleanup task (RDS stop + NAT Gateway delete) to the existing `northwind_daily_pipeline` Job.
 
-### Step 4-1: Lambda 呼出権限の追加 / Add Lambda invocation permissions
+> **認証方式について / Authentication approach:**
+>
+> cleanup ノートブックは `boto3` で AWS Lambda を直接呼び出すため、Databricks クラスター上で AWS 認証情報が必要です。
+> 本手順では **Unity Catalog サービスクレデンシャル** を使用します。これは Databricks 公式推奨の認証方式であり、
+> クラスターのアクセスモード（Dedicated / Standard）に依存せず動作します。
+>
+> 詳細な評価は `課題報告_NoCredentialsError.md` を参照してください。
 
-**目的**: Databricks クラスター（EC2）が NAT Gateway 削除 Lambda と RDS 停止 Lambda を呼び出せるようにする。
+### Step 4-1: Unity Catalog サービスクレデンシャル用 IAM ロールを作成する / Create IAM Role for UC Service Credential
 
-1. AWS Management Console → **IAM** → **「ロール」（Roles）** を開く
-2. Databricks のワークスペースロール（例: `northwind-databricks-workspace-role`）を検索して開く
-3. **「許可を追加」（Add permissions）** → **「インラインポリシーを作成」（Create inline policy）** をクリック
-4. **JSON** タブで以下のファイルの内容を貼り付ける:
+**目的**: Unity Catalog がサービスクレデンシャル経由で AssumeRole し、Lambda を呼び出すための IAM ロールを作成する。
 
-`notebooks_sprint2/story1-6/iam_policy_databricks_lambda_invoke.json`
+> **なぜ新しいロールが必要なのか / Why a new role:**
+>
+> 既存のワークスペースロールは EC2 クラスター管理用であり、信頼ポリシーが異なります。
+> サービスクレデンシャルには Databricks の UCMasterRole（`414351767826`）からの AssumeRole を許可する
+> 専用の信頼ポリシーが必要です。
 
-5. ポリシー名に **`northwind-lambda-invoke-policy`** と入力し、**「ポリシーの作成」（Create policy）** をクリック
+#### Step 4-1a: IAM ポリシーを作成する / Create the permissions policy
+
+1. AWS Management Console → **IAM** → **「ポリシー」（Policies）** を開く
+2. **「ポリシーの作成」（Create policy）** をクリック
+3. **「JSON」** ボタンをクリックして JSON モードに切り替える
+4. 既存の内容をすべて削除し、以下のファイルの内容を貼り付ける:
+
+`notebooks_sprint2/story1-6/iam_policy_uc_lambda_invoke.json`
+
+> **注意**: ファイル内の `<AWSアカウントID>` を実際の AWS アカウント ID に置き換えてから貼り付けること。
+
+5. **「次へ」（Next）** をクリック
+6. ポリシー名に **`northwind-uc-lambda-invoke-policy`** と入力
+7. **「ポリシーの作成」（Create policy）** をクリック
+
+#### Step 4-1b: IAM ロールを作成する（仮の信頼ポリシーで作成） / Create the IAM role with temporary trust policy
+
+1. AWS Management Console → **IAM** → 左メニュー **「ロール」（Roles）** → **「ロールを作成」（Create role）** をクリック
+
+2. **「信頼されたエンティティタイプ」（Trusted entity type）** で **「カスタム信頼ポリシー」（Custom trust policy）** を選択する
+
+   > **なぜ「カスタム信頼ポリシー」か:**
+   > 信頼先が Databricks 管理の AWS アカウント（`414351767826`）であり、ExternalId の条件も付ける必要があるため、JSON を直接指定する必要がある。
+   > Phase 2 で Lambda ロールを作ったときの「AWS のサービス → Lambda」は AWS が信頼ポリシーを自動生成してくれるパターンだが、今回は Databricks 固有の設定が必要なため自動生成は使えない。
+
+3. JSON エディタに以下のファイルの内容を貼り付ける:
+
+   `notebooks_sprint2/story1-6/iam_trust_policy_uc_lambda_invoke_initial.json`
+
+   > ExternalId の `"0000"` はプレースホルダー。Step 4-1d で実際の値に更新する。
+
+4. **「次へ」（Next）** をクリック
+
+5. **「許可ポリシー」（Permissions policies）** の検索バーに **`northwind-uc-lambda-invoke-policy`** と入力し、表示されたポリシーの**チェックボックス**にチェックを入れる
+
+6. **「次へ」（Next）** をクリック
+
+7. 以下を設定する:
+
+   | 設定項目 | 値 |
+   |---|---|
+   | ロール名 / Role name | **`northwind-uc-lambda-invoke-role`** |
+   | 説明 / Description | `Unity Catalog service credential role for Lambda invoke` |
+
+8. **「ロールを作成」（Create role）** をクリック
+
+#### Step 4-1c: Databricks にサービスクレデンシャルを作成する / Create Service Credential in Databricks
+
+1. Databricks ワークスペースにログイン
+2. 左サイドバー → **「Catalog」** をクリック
+3. **「External data >」** ボタン → **「Credentials」** タブをクリック
+4. **「Create credential」** をクリック
+5. **「Service Credential」** を選択
+6. 以下を入力する:
+
+| フィールド | 値 |
+|------------|-----|
+| Credential name | **`northwind-lambda-invoke-credential`** |
+| IAM Role ARN | **`arn:aws:iam::<AWSアカウントID>:role/northwind-uc-lambda-invoke-role`** |
+| Comment | `Lambda invoke for cleanup pipeline (Story 1-6)` |
+
+7. **「Create」** をクリック
+8. **表示される External ID をコピーして控える**（次の Step で使用）
+
+> **SQL で作成する場合:**
+> Databricks SQL エディタで以下のファイルの内容を実行する（`<AWSアカウントID>` を置換すること）:
+>
+> `notebooks_sprint2/story1-6/sql_4-1c_create_service_credential.sql`
+
+#### Step 4-1d: IAM ロールの信頼ポリシーを更新する / Update the IAM role trust policy
+
+Step 4-1c で取得した **External ID** を使って信頼ポリシーを更新する。
+
+1. AWS Management Console → **IAM** → 左メニュー **「ロール」（Roles）** を開く
+2. 検索バーに **`northwind-uc-lambda-invoke-role`** と入力してクリックする
+3. **「信頼関係」（Trust relationships）** タブをクリック
+4. **「信頼ポリシーを編集」（Edit trust policy）** ボタンをクリック
+5. JSON エディタの中身をすべて削除し、以下のファイルの内容を貼り付ける:
+
+   `notebooks_sprint2/story1-6/iam_trust_policy_uc_lambda_invoke.json`
+
+6. 貼り付けた JSON の以下 2 箇所を書き換える:
+
+   | プレースホルダー | 置換する値 |
+   |---|---|
+   | `<AWSアカウントID>` | 実際の AWS アカウント ID（12桁の数字） |
+   | `<Step 4-1c で取得した External ID に置換>` | Step 4-1c で控えた External ID |
+
+7. **「ポリシーを更新」（Update policy）** ボタンをクリック
+
+> **2 つの変更点（初期ポリシーからの差分）:**
+> 1. `sts:ExternalId` を `"0000"` から **実際の External ID** に変更
+> 2. `Principal.AWS` に **自分自身のロール ARN** を追加（Self-assuming — Databricks の必須要件）
+
+#### Step 4-1e: サービスクレデンシャルをバリデーションする / Validate the Service Credential
+
+1. Databricks → **Catalog** → **External data >** → **Credentials** タブ
+2. **`northwind-lambda-invoke-credential`** をクリック
+3. **「Validate」** ボタンをクリック（1〜2分かかる）
+
+以下がすべて **Pass** になることを確認する:
+
+| チェック項目 | 説明 |
+|-------------|------|
+| IAM Role Assumption | Unity Catalog がロールを Assume できるか |
+| Self Assume Role | ロールが自己参照できるか |
+| External ID | External ID が正しく設定されているか |
+
+> 失敗した場合は Step 4-1d の信頼ポリシーを再確認してください。
+
+#### Step 4-1f: アクセス権限を付与する / Grant ACCESS permission
+
+パイプラインを実行するユーザーまたはグループにサービスクレデンシャルへのアクセス権限を付与する。
+
+1. Databricks → **「カタログ（Catalog）」** → **「外部データ（External data） >」** → **「資格情報（Credentials）」** タブ
+2. **`northwind-lambda-invoke-credential`** をクリックして開く
+3. **「権限（Permissions）」** タブをクリック
+4. **「付与（Grant）」** ボタンをクリック
+5. 以下を設定する:
+
+   | フィールド | 操作 |
+   |---|---|
+   | ユーザー / グループ | パイプラインを実行するユーザー名またはグループ名を入力して選択 |
+   | 権限 / Permission | **ACCESS** を選択 |
+
+6. **「付与（Grant）」** をクリック
+7. 「権限（Permissions）」タブの一覧に **ACCESS** が表示されていることを確認する
 
 ### 【変更】Step 4-2: cleanup 用ノートブックを Databricks にアップロードする / Upload cleanup notebook to Databricks
 
@@ -629,6 +748,8 @@ Add a cleanup task (RDS stop + NAT Gateway delete) to the existing `northwind_da
 
 > **⚠️ 順番が重要 / Order matters:**
 > RDS 停止の API 呼出し（`boto3` → AWS API）はインターネット経由で行われるため、NAT Gateway が必要です。NAT Gateway を先に削除すると、RDS 停止の API 呼出しが失敗する可能性があります。必ず **RDS 停止 → NAT 削除** の順番を守ってください。
+
+> **前提**: Step 4-1 でサービスクレデンシャル `northwind-lambda-invoke-credential` の作成・バリデーション・権限付与が完了していること。ノートブック内で `dbutils.credentials.getServiceCredentialsProvider()` を使用して認証を行います。
 
 1. Databricks UI → 左メニュー **「ワークスペース」（Workspace）** をクリック
 2. 適切なフォルダ（例: `/Workspace/northwind/operations/`）に移動する
@@ -846,6 +967,8 @@ display(df)
 | EventBridge Scheduler コスト | 月14百万回まで無料。事実上無料 |
 | boto3 read_timeout | Databricks から Lambda を同期呼出する際は `read_timeout` を900秒に延長 |
 | Serverless Compute | S3 上の Delta Lake データ分析なら NAT Gateway・RDS 不要。手動分析時の利便性向上 |
+| boto3 認証方式 / boto3 auth | Unity Catalog サービスクレデンシャル（`northwind-lambda-invoke-credential`）を使用。インスタンスプロファイルは Standard アクセスモードで動作しないため不採用。詳細は `課題報告_NoCredentialsError.md` 参照 |
+| Databricks Runtime | サービスクレデンシャルには **DBR 16.2 以上**（GA）/ 15.4 LTS 以上（Preview）が必要 |
 
 ---
 
@@ -870,7 +993,10 @@ Phase 3: EventBridge Scheduler の設定（4つ）/ Configure EventBridge Schedu
       → Step 3-5（Databricksスケジュール確認 21:00 JST）
         ↓
 Phase 4: Databricks Workflows Job の更新 / Update Workflows Job
-  └── Step 4-1（権限追加）→ Step 4-2（cleanupノートブック配置）
+  └── Step 4-1a（UC用IAMポリシー作成）→ Step 4-1b（UC用IAMロール作成）
+      → Step 4-1c（Databricksサービスクレデンシャル作成）→ Step 4-1d（信頼ポリシー更新）
+      → Step 4-1e（バリデーション）→ Step 4-1f（ACCESS権限付与）
+      → Step 4-2（cleanupノートブック配置）
       → Step 4-3（cleanupタスク追加）→ Step 4-4（フロー確認）
         ↓
 Phase 5: テスト / Tests  ※個別 Lambda テスト（旧Phase A）は Phase 2 に統合済み
@@ -902,3 +1028,8 @@ Phase 5: テスト / Tests  ※個別 Lambda テスト（旧Phase A）は Phase 
 | 2026-04-XX | 【追加】概要セクションにコスト比較表を追加（NAT + RDS 合計: $66/月 → $3.3/月、約95%削減）/ Added cost comparison table to overview (NAT + RDS total: $66/mo → $3.3/mo, ~95% savings) |
 | 2026-04-08 | 【修正】EventBridge Scheduler のタイムゾーンを UTC → **Asia/Tokyo** に統一。cron 式は JST 直接指定に変更（RDS起動 `cron(45 20)`、NAT作成 `cron(55 20)`、安全ネット `cron(0 2)`）。UTC 変換が不要になり、時刻の読み間違いを防止 |
 | 2026-04-08 | 【整理】個別 Lambda 単体テスト（旧 Phase A）を Phase 2（Step 2-6〜2-9）に統合。NAT・RDS ともに Lambda 作成直後にテストを実施する一貫した構成に変更 / Consolidated individual Lambda unit tests (former Phase A) into Phase 2 (Steps 2-6 to 2-9). Both NAT and RDS now follow the same pattern: test immediately after creation |
+| 2026-04-13 | 【変更】Phase 4 Step 4-1 を全面改訂: インスタンスプロファイル＋インラインポリシー方式 → **Unity Catalog サービスクレデンシャル方式** に変更。Step 4-1a〜4-1f に細分化。アクセスモード非依存・Serverless 対応・UC ガバナンス対応。詳細な評価は `課題報告_NoCredentialsError.md` 参照 |
+| 2026-04-13 | 【変更】`nb_06_cleanup.py` の認証方式を `boto3.client()` → `dbutils.credentials.getServiceCredentialsProvider()` 経由の `boto3.Session().client()` に変更 |
+| 2026-04-13 | 【追加】関連ノートブック表に RDS Lambda コード、cleanup ノートブック、サービスクレデンシャル用 IAM ポリシー/信頼ポリシーを追加 |
+| 2026-04-13 | 【追加】注意事項に boto3 認証方式（サービスクレデンシャル）と Databricks Runtime 要件（DBR 16.2+ GA）を追記 |
+| 2026-04-13 | 【規約準拠】作成規約に基づきインラインコードを外部ファイルに外出し（sh x2、sql x2、json x1）。`iam_policy_databricks_lambda_invoke.json`（旧対策A の遺物）を削除 |

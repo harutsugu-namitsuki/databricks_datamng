@@ -25,12 +25,24 @@ import boto3
 import json
 from botocore.config import Config
 
+# Unity Catalog サービスクレデンシャルを使用して認証
+# 参照: 課題報告_NoCredentialsError.md - 対策C
+SERVICE_CREDENTIAL_NAME = "northwind-lambda-invoke-credential"
+AWS_REGION = "ap-northeast-1"
+
+boto3_session = boto3.Session(
+    botocore_session=dbutils.credentials.getServiceCredentialsProvider(
+        SERVICE_CREDENTIAL_NAME
+    ),
+    region_name=AWS_REGION,
+)
+
 # boto3 の read_timeout を延長する（NAT削除Lambda の同期呼出は最大10分かかるため）
 lambda_config = Config(
     read_timeout=900,  # 15分
     retries={"max_attempts": 0},
 )
-lambda_client = boto3.client("lambda", region_name="ap-northeast-1", config=lambda_config)
+lambda_client = boto3_session.client("lambda", config=lambda_config)
 
 # ============================================================
 # Step 1: RDS 停止（NAT Gateway がまだ存在する状態で実行）
