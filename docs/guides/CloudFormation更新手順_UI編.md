@@ -7,7 +7,7 @@
 ## 実施手順
 
 ### 1. テンプレートファイルの準備
-このリポジトリの `開発ドキュメント/cloudformation.yaml` に最新の修正（NAT Gateway等の追加）が反映されている状態であることを確認し、手元のPCに保存しておきます（またはGitHubからダウンロードしておきます）。
+このリポジトリの `infrastructure/cloudformation.yaml` に最新の修正（NAT Gateway等の追加）が反映されている状態であることを確認し、手元のPCに保存しておきます（またはGitHubからダウンロードしておきます）。
 
 ### 2. AWS Management Console へのアクセス
 1. ブラウザで [AWS Management Console](https://aws.amazon.com/console/) にログインします。

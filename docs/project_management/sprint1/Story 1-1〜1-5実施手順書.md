@@ -13,9 +13,9 @@
 
 | ノートブック | 用途 |
 |------------|------|
-| `docs/03_development/00_初期環境構築手順_インフラ/notebooks/02_etl_bronze_ingest.py` | Bronze取り込み（冪等化済み: `mode("overwrite")` でテーブル全体上書き） |
-| `docs/03_development/00_初期環境構築手順_インフラ/notebooks/03_etl_silver_transform.py` | Silver変換（冪等化済み: `dropDuplicates` 追加済み） |
-| `docs/03_development/00_初期環境構築手順_インフラ/notebooks/04_etl_gold_aggregate.py` | Gold集計（`mode("overwrite")` で冪等） |
+| `databricks/notebooks/02_etl_bronze_ingest.py` | Bronze取り込み（冪等化済み: `mode("overwrite")` でテーブル全体上書き） |
+| `databricks/notebooks/03_etl_silver_transform.py` | Silver変換（冪等化済み: `dropDuplicates` 追加済み） |
+| `databricks/notebooks/04_etl_gold_aggregate.py` | Gold集計（`mode("overwrite")` で冪等） |
 
 ### 前提条件チェック
 

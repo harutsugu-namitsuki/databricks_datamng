@@ -4,13 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Northwind Data Lakehouse — a reference implementation of Databricks + Unity Catalog on AWS using the medallion architecture (Bronze/Silver/Gold). The primary working variant is **AWSシングルクラウドVer/** (AWS single-cloud). A secondary **マルチクラウドVer/** (Azure Databricks) variant also exists.
+Northwind Data Lakehouse — a reference implementation of Databricks + Unity Catalog on AWS using the medallion architecture (Bronze/Silver/Gold).
+
+The repository is organized by **role** rather than by phase:
+- `src/` — application code (FastAPI / Streamlit store & admin apps)
+- `databricks/` — data-side code (`notebooks/` PySpark ETL, `operations/` helper scripts)
+- `infrastructure/` — IaC (CloudFormation templates)
+- `docs/` — all documentation (`design/`, `guides/`, `project_management/`, `operations/`, `archive/`)
 
 There is no build system, test runner, or package manager. All executable code runs as Databricks notebooks (PySpark) on a live Databricks workspace.
 
 ## Notebook Execution Order
 
-Notebooks in `AWSシングルクラウドVer/開発ドキュメント/notebooks/` must be run in this order:
+Notebooks in `databricks/notebooks/` must be run in this order:
 
 | Notebook | Timing | Purpose |
 |----------|--------|---------|
@@ -44,11 +50,11 @@ S3 (Delta Lake)
 
 | Path | Purpose |
 |------|---------|
-| `AWSシングルクラウドVer/開発ドキュメント/cloudformation.yaml` | IaC for VPC, RDS, S3, IAM roles, Security Groups |
-| `AWSシングルクラウドVer/開発ドキュメント/実装手順書.md` | 5-phase implementation guide (authoritative execution reference) |
-| `AWSシングルクラウドVer/設計ドキュメント/UnityCatalog設計書.md` | Unity Catalog namespace structure |
-| `AWSシングルクラウドVer/設計ドキュメント/権限設計.md` | IAM role permission details |
-| `AWSシングルクラウドVer/設計ドキュメント/テーブル設計書.md` | Delta table schemas for all layers |
+| `infrastructure/cloudformation.yaml` | IaC for VPC, RDS, S3, IAM roles, Security Groups |
+| `docs/guides/実装手順書.md` | 5-phase implementation guide (authoritative execution reference) |
+| `docs/design/data_platform/UnityCatalog設計書.md` | Unity Catalog namespace structure |
+| `docs/design/data_platform/権限設計.md` | IAM role permission details |
+| `docs/design/data_platform/テーブル設計書.md` | Delta table schemas for all layers |
 
 ## Data Source
 
@@ -63,11 +69,11 @@ RDS credentials are stored in **AWS Secrets Manager** and accessed via **Databri
 
 ## Documentation Conventions
 
-When writing sprint implementation guides (`docs/01_management/sprint*/Story*.md`):
+When writing sprint implementation guides (`docs/project_management/sprint*/Story*.md`):
 - **Never embed code inline** (SQL, Python, YAML, etc.) — always externalize to separate files (`.sql`, `.py`) and reference by filename
 - Use Phase → Step structure with a summary table at the top
 - Write in Japanese only (no bilingual format needed)
-- Full rules: `AWSシングルクラウドVer/docs/01_management/実施手順書_作成規約.md`
+- Full rules: `docs/project_management/実施手順書_作成規約.md`
 
 ## `skills/` Directory
 

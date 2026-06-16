@@ -249,7 +249,7 @@ AutoML 実験が完了したら、以下を確認する。
 3. Feature Importance プロットのスクリーンショットを取得する
 4. ベストモデルのメトリクス画面のスクリーンショットを取得する
 
-> **保存先**: `docs/01_management/sprint3/証跡/` 配下に保存する。
+> **保存先**: `docs/project_management/sprint3/証跡/` 配下に保存する。
 
 ---
 

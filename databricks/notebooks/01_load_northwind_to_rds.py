@@ -8,7 +8,7 @@
 # MAGIC **データソース**:
 # MAGIC - リポジトリ: https://github.com/pthom/northwind_psql
 # MAGIC - SQLファイル: https://raw.githubusercontent.com/pthom/northwind_psql/master/northwind.sql
-# MAGIC - ローカルコピー: `設計ドキュメント/northwind.sql`
+# MAGIC - ローカルコピー: `docs/design/data_platform/northwind.sql`
 # MAGIC
 # MAGIC **前提条件**:
 # MAGIC - RDS PostgreSQL が起動している（CloudFormation デプロイ済み）
