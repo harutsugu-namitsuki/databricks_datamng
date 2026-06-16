@@ -75,6 +75,6 @@ When writing sprint implementation guides (`docs/project_management/sprint*/Stor
 - Write in Japanese only (no bilingual format needed)
 - Full rules: `docs/project_management/実施手順書_作成規約.md`
 
-## `skills/` Directory
+## Skill Reference Collections
 
-The `skills/` subdirectory contains cloned third-party Claude skill repositories (agentkits-marketing, claude-skills, Product-Manager-Skills, etc.). These are reference materials unrelated to the Databricks project.
+Third-party Claude skill repositories (anthropics/skills, alirezarezvani/claude-skills, deanpeters/Product-Manager-Skills, aitytech/agentkits-marketing, VoltAgent/awesome-agent-skills) are **not** part of this repo. They are kept as a user-level reference library at `~/.claude/skills-reference/` (cloned from upstream, `git pull` to refresh) and `skills/` is gitignored. Skills actually loaded by Claude Code live under `.claude/skills/`.

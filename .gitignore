@@ -1,3 +1,6 @@
+# Reference skill collections (moved to ~/.claude/skills-reference/, kept out of this repo)
+skills/
+
 # General
 .DS_Store
 Thumbs.db
