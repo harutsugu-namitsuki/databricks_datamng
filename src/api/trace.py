@@ -35,3 +35,58 @@ def extract_tables(sql: str) -> list[str]:
         if name and name not in found:
             found.append(name)
     return found or ["不明"]
+
+
+# ---------------------------------------------------------------------------
+# span モデルと contextvar による「現在のトレース」管理
+# ---------------------------------------------------------------------------
+
+import contextvars
+import itertools
+import time
+import uuid
+
+# 現在処理中のトレース文脈（middleware が設定、db.py 計装が参照）。
+# async→threadpool 間も contextvars はコピーされるため sync エンドポイントからも見える。
+_current = contextvars.ContextVar("trace_ctx", default=None)
+
+
+class TraceCtx:
+    """1リクエスト＝1トレースの文脈。span_id を採番する。"""
+    def __init__(self, trace_id: str):
+        self.trace_id = trace_id
+        self._seq = itertools.count(1)
+        self.last_span_id = "root"
+
+    def next_span_id(self) -> str:
+        return f"s{next(self._seq):03d}"
+
+
+def new_trace_id() -> str:
+    return uuid.uuid4().hex[:8]
+
+
+def start_trace(trace_id: str | None = None) -> TraceCtx:
+    ctx = TraceCtx(trace_id or new_trace_id())
+    _current.set(ctx)
+    return ctx
+
+
+def current() -> "TraceCtx | None":
+    return _current.get()
+
+
+def make_span(layer: str, node: str, kind: str, *, detail: str = "",
+              tables: list[str] | None = None, dur_ms: float = 0.0,
+              status: str = "ok", parent: str = "root") -> dict:
+    ctx = current()
+    return {
+        "trace_id": ctx.trace_id if ctx else new_trace_id(),
+        "span_id": ctx.next_span_id() if ctx else "s001",
+        "parent_span_id": parent,
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()) +
+              f".{int((time.time() % 1) * 1000):03d}",
+        "layer": layer, "node": node, "kind": kind,
+        "detail": detail, "tables": tables or [], "dur_ms": round(dur_ms, 2),
+        "status": status,
+    }
