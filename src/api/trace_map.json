@@ -671,5 +671,19 @@
       "h_order",
       "db"
     ]
-  ]
+  ],
+  "routes": {
+    "/api/products": "h_list",
+    "/api/dashboard": "h_dash",
+    "/api/auth/store": "h_slogin",
+    "/api/inventory/adjust": "h_adj",
+    "/api/orders": "h_order"
+  },
+  "pages": {
+    "catalog.html": "catalog",
+    "checkout.html": "checkout",
+    "inventory.html": "inventory",
+    "dashboard.html": "dashPage",
+    "login.html": "login"
+  }
 }

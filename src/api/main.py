@@ -74,12 +74,17 @@ async def trace_middleware(request, call_next):
         path = request.url.path
         # 静的配信や /trace 自身は記録しない（ノイズ・自己観測ループ防止）
         if path.startswith("/api"):
-            trace.record(trace.make_span(
+            # 参照元画面（Referer のファイル名）を載せる＝可視化で画面ノードを点灯するため
+            ref = request.headers.get("referer", "")
+            page = ref.rsplit("/", 1)[-1].split("?")[0] if ref else ""
+            span = trace.make_span(
                 "http", path, "http",
                 detail=f"{request.method} {path}",
                 dur_ms=dur,
                 status=status,
-            ))
+            )
+            span["page"] = page
+            trace.record(span)
 
 # ---------------------------------------------------------------------------
 # 簡易認証 (トークン → ユーザー情報 のメモリキャッシュ)
