@@ -26,6 +26,9 @@ credentials
 # Databricks
 .databricks/
 
+# 操作トレース可視化システムの出力（生イベント/ロールアップJSONL）
+trace_data/
+
 # Private Documents (Promotion related)
 private/
 昇進会議/
