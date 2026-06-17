@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>操作トレース可視化システム — ビューア</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#30363d;
+    --txt:#e6edf3; --muted:#8b949e; --accent:#58a6ff;
+    --teal:#2dd4bf; --err:#f85149;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:#0b0f14}
+  header h1{font-size:17px;margin:0;font-weight:600}
+  header .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);
+    padding:2px 8px;border-radius:10px}
+  header .tag.live{color:var(--teal);border-color:#1c3a36}
+  header .tag.live.off{color:var(--err);border-color:#3a1c1c}
+  .modes{display:flex;gap:6px;margin-left:auto}
+  .modes button,.windows button{
+    background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}
+  .modes button.on{background:var(--accent);color:#0b0f14;border-color:var(--accent);font-weight:600}
+  .windows button.on{background:#d29922;color:#0b0f14;border-color:#d29922;font-weight:600}
+  .toolbar{padding:10px 20px;border-bottom:1px solid var(--line);
+    display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#0b0f14;min-height:46px}
+  .toolbar .grp{display:flex;gap:6px;align-items:center}
+  .toolbar .lbl{font-size:12px;color:var(--muted);margin-right:4px}
+  main{display:flex;height:calc(100vh - 118px)}
+  .stage{position:relative;flex:1;overflow:hidden}
+  #svg{position:absolute;inset:0;width:100%;height:100%}
+  #fx{position:absolute;inset:0;pointer-events:none}
+  aside{width:330px;border-left:1px solid var(--line);background:var(--panel);
+    padding:16px;overflow:auto}
+  aside h2{font-size:13px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.05em;margin:0 0 8px}
+  .detail{font-size:13px;line-height:1.7}
+  .detail .k{color:var(--muted)}
+  .detail code{background:#0b0f14;border:1px solid var(--line);border-radius:4px;
+    padding:1px 5px;font-size:12px;color:#a5d6ff}
+  .detail .title{font-size:16px;font-weight:700;margin:4px 0 10px}
+  .onebox{background:#13202b;border:1px solid #234;border-left:3px solid var(--accent);
+    border-radius:0 7px 7px 0;padding:8px 10px;font-size:13.5px;margin-bottom:10px}
+  .easy{font-size:13px;line-height:1.85;margin:8px 0}
+  .term{border-bottom:1px dotted #d29922;color:#f0c674;cursor:help}
+  .glossary{margin-top:12px;background:#0b0f14;border:1px solid var(--line);
+    border-radius:7px;padding:8px 10px}
+  .glossary .gh{font-size:11px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.05em;margin-bottom:5px}
+  .glossary dl{margin:0}
+  .glossary dt{font-weight:700;color:#f0c674;font-size:12.5px;margin-top:6px}
+  .glossary dt .read{color:var(--muted);font-weight:400;font-size:10.5px;margin-left:5px}
+  .glossary dd{margin:1px 0 0;font-size:12px;color:var(--txt);line-height:1.6}
+  .sql{background:#0b0f14;border:1px solid var(--line);border-radius:6px;padding:8px;
+    font-family:Consolas,monospace;font-size:11.5px;color:#7ee787;white-space:pre-wrap;
+    margin-top:6px;line-height:1.5}
+  .trace-log{margin-top:18px}
+  .trace-step{font-size:12px;padding:5px 8px;border-left:2px solid var(--line);
+    margin:3px 0;color:var(--muted);background:var(--panel2);border-radius:0 5px 5px 0}
+  .trace-step.err{border-left-color:var(--err);color:#ffb4ae}
+  .trace-step b{color:var(--txt)}
+  .trace-step .tid{color:#a5d6ff;font-family:Consolas,monospace}
+  .legend{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--muted);
+    background:rgba(13,17,23,.8);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
+  .legend .row{display:flex;align-items:center;gap:6px;margin:2px 0}
+  .swatch{width:22px;height:4px;border-radius:2px}
+  .colhead{fill:var(--muted);font-size:11px;font-weight:600;letter-spacing:.04em}
+  .hint{font-size:11px;color:var(--muted)}
+  .node rect{transition:fill .2s,stroke .2s}
+  .node text{font-size:11.5px;fill:var(--txt);pointer-events:none}
+  .node .sub{font-size:9px;fill:var(--muted)}
+  .node{cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛰 操作トレース可視化システム</h1>
+  <span class="tag">Northwind ローカル開発環境</span>
+  <span class="tag live off" id="conn">● 未接続</span>
+  <div class="modes">
+    <button id="m-rt" class="on" onclick="setMode('rt')">● リアルタイム</button>
+    <button id="m-hist" onclick="setMode('hist')">▦ 履歴（集計）</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="grp" id="rt-tools">
+    <span class="hint">アプリを操作すると、その1クリックが起こす経路が点灯し、粒子が流れます。<b style="color:var(--err)">失敗（認証エラー等）は赤</b>で表示。</span>
+  </div>
+  <div class="grp" id="hist-tools" style="display:none">
+    <span class="lbl">時間窓 ▶</span>
+    <div class="windows" id="window-btns"></div>
+  </div>
+</div>
+
+<main>
+  <div class="stage">
+    <svg id="svg" viewBox="0 0 1320 720" preserveAspectRatio="xMidYMid meet"></svg>
+    <canvas id="fx"></canvas>
+    <div class="legend" id="legend"></div>
+  </div>
+  <aside>
+    <h2>詳細パネル</h2>
+    <div class="detail" id="detail">マップを読み込んでいます…</div>
+    <div class="trace-log" id="tracelog"></div>
+  </aside>
+</main>
+
+<script src="/static/trace/viewer.js"></script>
+</body>
+</html>
