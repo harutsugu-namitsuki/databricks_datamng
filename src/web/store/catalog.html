@@ -41,6 +41,7 @@
   </div>
 
   <!-- カート追加 toast -->
+  <script src="/static/js/trace-client.js"></script>
   <script src="/static/js/api.js"></script>
   <script>
     if (!api.getStoreToken()) window.location.href = '/static/store/login.html';
@@ -54,6 +55,34 @@
       const sel = document.getElementById('filterCat');
       categories.forEach(c => sel.innerHTML += `<option value="${c.category_name}">${c.category_name}</option>`);
       loadProducts();
+    }
+
+    const CATEGORY_META = {
+      'Beverages':      { icon: '🍺', seed: 'bev' },
+      'Condiments':     { icon: '🧴', seed: 'cnd' },
+      'Confections':    { icon: '🍫', seed: 'con' },
+      'Dairy Products': { icon: '🧀', seed: 'dri' },
+      'Grains/Cereals': { icon: '🌾', seed: 'grn' },
+      'Meat/Poultry':   { icon: '🥩', seed: 'mea' },
+      'Produce':        { icon: '🥦', seed: 'pro' },
+      'Seafood':        { icon: '🐟', seed: 'sea' },
+    };
+
+    // ローカル画像を優先 (src/web/img/products/{id}.jpg)。
+    // 差し替えたい場合はこのフォルダの該当ファイルを置き換えるだけ。
+    function productImageUrl(p) {
+      return `/static/img/products/${p.product_id}.jpg`;
+    }
+
+    // ローカル画像が無い場合のフォールバック (外部CDNのランダム画像)。
+    function productFallbackUrl(p) {
+      const meta = CATEGORY_META[p.category_name] || { seed: 'fd' };
+      return `https://picsum.photos/seed/${meta.seed}${p.product_id}/480/320`;
+    }
+
+    function categoryIcon(p) {
+      const meta = CATEGORY_META[p.category_name];
+      return meta ? meta.icon : '🍽️';
     }
 
     async function loadProducts() {
@@ -74,18 +103,26 @@
 
       grid.innerHTML = active.map(p => `
         <div class="product-card">
-          <div>
-            <div class="product-name">${p.product_name}</div>
-            <div class="product-category">${p.category_name} · ${p.supplier_name}</div>
+          <div class="product-img-wrap">
+            <img class="product-img" src="${productImageUrl(p)}" alt="${p.product_name}" loading="lazy"
+                 data-fallback="${productFallbackUrl(p)}"
+                 onerror="if(this.dataset.fallback){this.src=this.dataset.fallback; this.dataset.fallback='';}else{this.onerror=null; this.classList.add('img-error');}">
+            <span class="product-cat-icon">${categoryIcon(p)}</span>
           </div>
-          <div class="product-price">$${Number(p.unit_price).toFixed(2)}</div>
-          <div class="product-stock">在庫: ${p.units_in_stock} / ${p.quantity_per_unit || ''}</div>
-          ${p.units_in_stock > 0 ? `
-            <div class="qty-row">
-              <input type="number" id="qty_${p.product_id}" value="1" min="1" max="${p.units_in_stock}" style="width:70px; text-align:center; padding:6px 8px; border:1px solid #e2e8f0; border-radius:6px;">
-              <button class="btn btn-primary btn-sm" style="flex:1;" onclick="addToCart(${JSON.stringify(p).replace(/"/g,'&quot;')})">カートに追加</button>
+          <div class="product-body">
+            <div>
+              <div class="product-name">${p.product_name}</div>
+              <div class="product-category">${p.category_name} · ${p.supplier_name}</div>
             </div>
-          ` : '<span class="badge badge-danger">在庫切れ</span>'}
+            <div class="product-price">$${Number(p.unit_price).toFixed(2)}</div>
+            <div class="product-stock">在庫: ${p.units_in_stock} / ${p.quantity_per_unit || ''}</div>
+            ${p.units_in_stock > 0 ? `
+              <div class="qty-row">
+                <input type="number" id="qty_${p.product_id}" value="1" min="1" max="${p.units_in_stock}" style="width:70px; text-align:center; padding:6px 8px; border:1px solid #e2e8f0; border-radius:6px;">
+                <button class="btn btn-primary btn-sm" style="flex:1;" onclick="addToCart(${JSON.stringify(p).replace(/"/g,'&quot;')})">カートに追加</button>
+              </div>
+            ` : '<span class="badge badge-danger">在庫切れ</span>'}
+          </div>
         </div>
       `).join('');
     }
