@@ -1,0 +1,174 @@
+@startuml 概念データモデル
+
+' ════════════════════════════════════════════════════════════
+'  Northwind 商社（食品輸入卸） — 概念データモデル
+'  ・業務エンティティとその関連を「業務の言葉」で表現する
+'  ・物理ER（テーブル設計書_ER図.puml）とは別物。型・メタ列は持たない
+'  ・白  = 既存（RDS/データ基盤に実体あり）
+'  ・赤  = 商社業務として必須だが現状欠落（仕入・在庫・会計）
+' ════════════════════════════════════════════════════════════
+
+skinparam linetype ortho
+skinparam shadowing false
+hide circle
+hide methods
+skinparam entity {
+    FontSize 12
+    AttributeFontSize 11
+    BorderColor #555555
+}
+!define EXIST   #FFFFFF
+!define MISSING #FDECEA
+
+title Northwind 商社 — 概念データモデル（業務エンティティ）\n白=既存 / 赤=商社業務に必須だが欠落
+
+' ── 組織・営業 ───────────────────────────────────
+package "組織・営業" {
+    entity "従業員\n(営業担当)" as employee EXIST {
+        従業員
+        --
+        氏名 / 役職
+        上司（自己参照）
+    }
+    entity "営業エリア\n(テリトリ/地域)" as territory EXIST {
+        テリトリ
+        --
+        地域
+    }
+}
+
+' ── 販売（Sell-side）既存 ────────────────────────
+package "販売 (Sell-side) — 既存" {
+    entity "顧客\n(取引先バイヤー)" as customer EXIST {
+        顧客
+        --
+        企業名 / 担当者 / 国
+    }
+    entity "受注\n(注文ヘッダ)" as order EXIST {
+        受注
+        --
+        注文日 / 希望納期 / 出荷日
+        配送先
+    }
+    entity "受注明細" as order_line EXIST {
+        受注 × 商品
+        --
+        数量 / 単価 / 割引
+    }
+}
+
+' ── 商品（共通マスタ）─────────────────────────────
+package "商品" {
+    entity "商品" as product EXIST {
+        商品
+        --
+        商品名 / 単価
+        ' 在庫関連の数値が埋め込まれている（要・在庫エンティティ化）
+        在庫数 / 発注中数 / 発注点
+    }
+    entity "商品カテゴリ" as category EXIST {
+        カテゴリ
+    }
+}
+
+' ── 物流 ─────────────────────────────────────────
+package "物流" {
+    entity "配送業者" as shipper EXIST {
+        配送業者
+    }
+}
+
+' ── 調達（Buy-side）欠落 ─────────────────────────
+package "調達 (Buy-side) — ★欠落" {
+    entity "仕入先" as supplier EXIST {
+        仕入先
+        --
+        企業名 / 国
+    }
+    entity "発注\n(購買PO)" as purchase_order MISSING {
+        ★未実装
+        --
+        発注日 / 入荷予定日
+        ステータス
+    }
+    entity "発注明細" as po_line MISSING {
+        ★未実装
+        --
+        発注数量 / 仕入単価
+    }
+    entity "入荷・検品" as goods_receipt MISSING {
+        ★未実装
+        --
+        入荷日 / 検品結果
+        入荷数量
+    }
+}
+
+' ── 在庫（欠落／埋込を独立化）────────────────────
+package "在庫 — △埋込" {
+    entity "在庫\n(倉庫×商品)" as stock MISSING {
+        ★要・独立化
+        --
+        現在庫 / 引当 / ロット
+    }
+    entity "在庫移動履歴" as stock_txn MISSING {
+        ★未実装
+        --
+        入庫 / 出庫 / 調整
+    }
+}
+
+' ── 会計（欠落）──────────────────────────────────
+package "会計 — ★欠落" {
+    entity "売上請求\n(債権)" as invoice_ar MISSING {
+        ★未実装
+    }
+    entity "仕入支払\n(債務)" as invoice_ap MISSING {
+        ★未実装
+    }
+}
+
+' ════════════════════════════════════════════════
+'  関連（業務の動詞で表現）
+' ════════════════════════════════════════════════
+
+' 販売フロー
+customer     ||--o{ order        : "発注する"
+order        ||--|{ order_line   : "含む"
+product      ||--o{ order_line   : "対象"
+employee     ||--o{ order        : "担当する"
+shipper      ||--o{ order        : "配送する"
+order        ||--o| invoice_ar   : "請求する"
+
+' 商品マスタ
+category     ||--o{ product      : "分類する"
+supplier     ||--o{ product      : "供給する"
+
+' 組織
+employee     }o--o| employee     : "報告する"
+employee     }o--o{ territory    : "受け持つ"
+
+' 調達フロー（あるべき姿）
+supplier        ||--o{ purchase_order : "受注する"
+purchase_order  ||--|{ po_line        : "含む"
+product         ||--o{ po_line        : "対象"
+purchase_order  ||--o{ goods_receipt  : "入荷される"
+goods_receipt   ||--o{ stock_txn      : "入庫を生む"
+purchase_order  ||--o| invoice_ap     : "支払う"
+
+' 在庫フロー
+product      ||--o| stock        : "在庫を持つ"
+stock        ||--o{ stock_txn    : "増減する"
+order_line   ||--o{ stock_txn    : "出庫を生む"
+
+' ── 凡例 ─────────────────────────────────────────
+legend right
+  |= 色 |= 意味 |
+  |<#FFFFFF>| 既存（RDS / データ基盤に実体あり） |
+  |<#FDECEA>| 商社業務に必須だが現状欠落（要設計） |
+  --
+  販売(Sell-side)は実装済。調達(Buy-side)・在庫・会計が空白。
+  products の「発注中数/発注点」列は、発注システムの存在を前提にしている。
+endlegend
+
+@enduml

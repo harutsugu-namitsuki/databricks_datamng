@@ -29,7 +29,7 @@ S3 (Delta Lake)
 
 | ディレクトリ | 役割 | 主な中身 |
 |---|---|---|
-| [`src/`](src/) | アプリケーションコード | FastAPI バックエンド・HTML/JS フロント・Streamlit版（[README](src/README.md)） |
+| [`src/`](src/) | アプリケーションコード | FastAPI バックエンド・HTML/JS フロント（ECストア / 業務管理）（[README](src/README.md)） |
 | [`databricks/`](databricks/) | データ基盤コード | `notebooks/`（PySpark ETL）、`operations/`（運用補助スクリプト） |
 | [`infrastructure/`](infrastructure/) | IaC | CloudFormation テンプレート（VPC / RDS / S3 / IAM / SG） |
 | [`docs/`](docs/) | ドキュメント全般 | `design/`・`guides/`・`project_management/`・`operations/`・`archive/` |

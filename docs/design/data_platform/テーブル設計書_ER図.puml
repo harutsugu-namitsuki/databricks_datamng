@@ -30,7 +30,7 @@ entity "suppliers\n（仕入先マスタ）" as suppliers {
     contact_name     : varchar(30)
     country          : varchar(15)
     phone            : varchar(24)
-    homepage         : varchar(100)
+    homepage         : text
 }
 
 entity "products\n（商品マスタ）" as products {
@@ -92,7 +92,7 @@ entity "region\n（地域マスタ）" as region {
 entity "territories\n（テリトリマスタ）" as territories {
     * territory_id           : varchar(20)  <<PK>>
     --
-    territory_description    : varchar(50)
+    territory_description    : varchar(60)
     region_id                : smallint     <<FK>>
 }
 
@@ -101,7 +101,7 @@ entity "us_states\n（米国州マスタ）" as us_states {
     --
     state_name       : varchar(100)
     state_abbr       : varchar(2)
-    state_region     : smallint
+    state_region     : varchar(50)
 }
 
 ' ── トランザクション系 ─────────────────────────────

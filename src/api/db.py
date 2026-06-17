@@ -2,8 +2,15 @@
 
 import os
 import contextlib
+from pathlib import Path
+
 import psycopg2
 import psycopg2.extras
+from dotenv import load_dotenv
+
+# リポジトリ直下の .env を読み込む（src/api/db.py → parents[2] = リポジトリルート）。
+# これが無いと os.environ に接続情報が入らず、既定値(localhost/postgres)に落ちる。
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
 def _params():
