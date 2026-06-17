@@ -90,3 +90,71 @@ def make_span(layer: str, node: str, kind: str, *, detail: str = "",
         "detail": detail, "tables": tables or [], "dur_ms": round(dur_ms, 2),
         "status": status,
     }
+
+
+# ---------------------------------------------------------------------------
+# JSONL 追記コレクタ ＋ SSE pub/sub（スレッド安全）
+# ---------------------------------------------------------------------------
+
+import asyncio
+import json
+import threading
+from pathlib import Path
+
+# 出力先: リポジトリ直下 trace_data/（db.py と同じ parents[2] 基準）
+_DATA_DIR = Path(__file__).resolve().parents[2] / "trace_data"
+_DATA_DIR.mkdir(exist_ok=True)
+_write_lock = threading.Lock()
+
+# SSE 購読者（可視化ビュー）の asyncio.Queue 群と、メインイベントループ参照。
+_subscribers: set[asyncio.Queue] = set()
+_loop: asyncio.AbstractEventLoop | None = None
+
+
+def bind_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """起動時にメインイベントループを記録（worker thread から push するため）。"""
+    global _loop
+    _loop = loop
+
+
+def _events_path() -> Path:
+    return _DATA_DIR / f"events-{time.strftime('%Y%m%d')}.jsonl"
+
+
+def record(span: dict) -> None:
+    """span を JSONL に追記し、SSE 購読者へ push する。
+    いかなる失敗もここで握りつぶす（被観測アプリを止めない: FR-T6）。"""
+    try:
+        line = json.dumps(span, ensure_ascii=False)
+        with _write_lock:
+            with _events_path().open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        _publish(span)
+        _rollup_accumulate(span)  # Task 6.1 で本実装
+    except Exception:
+        pass
+
+
+def _publish(span: dict) -> None:
+    if not _loop:
+        return
+    for q in list(_subscribers):
+        try:
+            _loop.call_soon_threadsafe(q.put_nowait, span)
+        except Exception:
+            pass
+
+
+def subscribe() -> asyncio.Queue:
+    q: asyncio.Queue = asyncio.Queue(maxsize=1000)
+    _subscribers.add(q)
+    return q
+
+
+def unsubscribe(q: asyncio.Queue) -> None:
+    _subscribers.discard(q)
+
+
+# Task 6.1 までの暫定スタブ（後で本実装に置換）
+def _rollup_accumulate(span: dict) -> None:
+    pass
