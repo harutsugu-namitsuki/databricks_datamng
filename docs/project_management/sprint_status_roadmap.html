@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Northwind スプリント現況 & 再計画ロードマップ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1419;
+  --panel: #171e26;
+  --panel-2: #1d2630;
+  --grid: #2a3540;
+  --grid-strong: #3a4856;
+  --text: #e6edf3;
+  --text-dim: #97a4b2;
+  --accent: #4aa8ff;
+  --gutter: 158px;
+
+  --done: #2ea043;
+  --done-bg: #16361f;
+  --partial: #d9a23b;
+  --partial-bg: #3a2e12;
+  --progress: #3b8eea;
+  --progress-bg: #122c47;
+  --planned-border: #4a5a6a;
+  --new: #b56cff;
+  --today: #ff5d5d;
+  --stall: rgba(255,93,93,0.07);
+
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'IBM Plex Sans JP', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--sans); line-height: 1.5;
+  padding: 28px 22px 60px;
+}
+header { max-width: 1180px; margin: 0 auto 18px; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: .2px; }
+.sub { color: var(--text-dim); font-size: .9rem; }
+.sub .mono { font-family: var(--mono); color: var(--accent); }
+
+.wrap { max-width: 1180px; margin: 0 auto; }
+
+/* summary cards */
+.summary { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 22px; }
+.stat {
+  background: var(--panel); border: 1px solid var(--grid); border-radius: 10px;
+  padding: 12px 16px; min-width: 120px; flex: 1;
+}
+.stat .n { font-family: var(--mono); font-size: 1.7rem; font-weight: 600; }
+.stat .l { font-size: .78rem; color: var(--text-dim); }
+.stat.done .n { color: var(--done); }
+.stat.partial .n { color: var(--partial); }
+.stat.progress .n { color: var(--progress); }
+.stat.planned .n { color: var(--text-dim); }
+
+/* legend */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  font-size: .8rem; color: var(--text-dim); margin-bottom: 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chip { width: 26px; height: 13px; border-radius: 3px; display: inline-block; }
+.chip.done { background: var(--done); }
+.chip.partial { background: var(--partial); }
+.chip.progress { background: var(--progress); }
+.chip.planned { background: transparent; border: 1.5px dashed var(--planned-border); }
+.chip.new { background: transparent; border: 1.5px solid var(--new); }
+.chip.today { background: var(--today); width: 3px; height: 15px; }
+
+/* timeline */
+.tl { background: var(--panel); border: 1px solid var(--grid); border-radius: 12px;
+  position: relative; overflow: hidden; }
+.axis { position: relative; height: 34px; border-bottom: 1px solid var(--grid-strong);
+  background: var(--panel-2); }
+.axis .m { position: absolute; top: 0; height: 100%; border-left: 1px solid var(--grid);
+  font-family: var(--mono); font-size: .68rem; color: var(--text-dim);
+  padding: 9px 0 0 5px; }
+.axis .m.q { border-left-color: var(--grid-strong); }
+.axis .cap { position: absolute; left: 10px; top: 9px; font-family: var(--mono);
+  font-size: .66rem; color: var(--text-dim); }
+
+.lanes { position: relative; }
+.lane { position: relative; border-bottom: 1px solid var(--grid); height: 64px; }
+.lane:last-child { border-bottom: none; }
+.lane .label { position: absolute; left: 0; top: 0; height: 100%;
+  display: flex; align-items: center; padding-left: 12px; width: var(--gutter);
+  font-size: .82rem; font-weight: 600; color: var(--text);
+  border-right: 1px solid var(--grid-strong);
+  background: var(--panel-2); z-index: 4; }
+
+/* month gridlines overlay across lanes */
+.grid-overlay { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.grid-overlay .gl { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--grid); }
+.grid-overlay .gl.q { border-left-color: var(--grid-strong); }
+
+/* stall region + today */
+.stall-region { position: absolute; top: 0; bottom: 0; background: var(--stall);
+  z-index: 1; pointer-events: none;
+  border-left: 1px dashed rgba(255,93,93,.4); border-right: 1px dashed rgba(255,93,93,.4); }
+.today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--today);
+  z-index: 6; }
+.today-line::after { content: "TODAY 26/06/17"; position: absolute; top: -28px; left: 3px;
+  font-family: var(--mono); font-size: .64rem; color: var(--today); white-space: nowrap; }
+.mstone { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--text-dim);
+  z-index: 5; }
+.mstone::after { content: attr(data-label); position: absolute; top: -14px; left: 4px;
+  font-family: var(--mono); font-size: .6rem; color: var(--text-dim); white-space: nowrap; }
+
+/* bars */
+.bar { position: absolute; top: 14px; height: 36px; border-radius: 7px;
+  display: flex; align-items: center; padding: 0 9px; gap: 6px; cursor: pointer;
+  font-size: .76rem; font-weight: 500; color: #fff; z-index: 3;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  border: 1px solid transparent; transition: transform .08s, box-shadow .08s; }
+.bar:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.4); z-index: 7;
+  overflow: visible; }
+.bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bar .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: rgba(255,255,255,.85); }
+.bar.done { background: var(--done-bg); border-color: var(--done); color: #b9f0c4; }
+.bar.partial { background: var(--partial-bg); border-color: var(--partial); color: #f3d79a; }
+.bar.progress { background: var(--progress-bg); border-color: var(--progress); color: #b3d9ff; }
+.bar.planned { background: var(--panel-2); border: 1.5px dashed var(--planned-border); color: var(--text-dim); }
+.bar.new { background: var(--panel-2); border: 1.5px solid var(--new); color: #d9bcff; }
+.bar .tag { font-family: var(--mono); font-size: .58rem; padding: 1px 4px; border-radius: 3px;
+  background: var(--new); color: #150022; font-weight: 600; flex: none; }
+
+/* detail panel */
+.detail { margin-top: 18px; background: var(--panel); border: 1px solid var(--grid);
+  border-radius: 12px; padding: 18px 20px; min-height: 84px; }
+.detail h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.detail .meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: .8rem;
+  color: var(--text-dim); margin-bottom: 10px; align-items: center; }
+.detail .meta b { color: var(--text); font-weight: 600; }
+.detail .badge { font-family: var(--mono); font-size: .7rem; padding: 2px 9px; border-radius: 20px;
+  color: #0f1419; font-weight: 600; }
+.detail .body { font-size: .9rem; color: #cdd8e3; }
+.detail .empty { color: var(--text-dim); font-style: italic; margin: 0; }
+
+footer { max-width: 1180px; margin: 26px auto 0; color: var(--text-dim);
+  font-size: .72rem; font-family: var(--mono); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+@media (max-width: 700px) {
+  body { padding: 18px 12px 40px; }
+  .axis, .grid-overlay, .stall-region, .today-line, .mstone { display: none; }
+  .lane { height: auto; padding: 8px 0; border-bottom: 1px solid var(--grid-strong); }
+  .lane .label { position: static; width: auto; height: auto; background: none; border: none;
+    padding: 0 0 6px 4px; font-size: .92rem; color: var(--accent); }
+  .bar { position: static !important; width: auto !important; left: auto !important;
+    height: auto; min-height: 38px; margin: 6px 4px; white-space: normal; overflow: visible;
+    flex-wrap: wrap; padding: 8px 11px; }
+  .bar .range-m { display: inline; font-family: var(--mono); font-size: .66rem; opacity: .8; width: 100%; }
+}
+.range-m { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Northwind スプリント現況 &amp; 再計画ロードマップ</h1>
+  <div class="sub">期間 <span class="mono">2025-11 → 2026-12</span> ・ 旧計画は <span class="mono">2026-03-22</span> 終了予定で停止 ・ 現在地 <span class="mono">2026-06-17</span>（整理/再編フェーズ）</div>
+</header>
+
+<div class="wrap">
+  <div class="summary">
+    <div class="stat done"><div class="n" id="s-done">0</div><div class="l">完了（証跡あり）</div></div>
+    <div class="stat partial"><div class="n" id="s-partial">0</div><div class="l">部分完了 / 打ち切り</div></div>
+    <div class="stat progress"><div class="n" id="s-progress">0</div><div class="l">進行中</div></div>
+    <div class="stat planned"><div class="n" id="s-planned">0</div><div class="l">未着手（再計画対象）</div></div>
+  </div>
+
+  <div class="legend">
+    <span><i class="chip done"></i>完了</span>
+    <span><i class="chip partial"></i>部分 / 打ち切り</span>
+    <span><i class="chip progress"></i>進行中</span>
+    <span><i class="chip planned"></i>未着手</span>
+    <span><i class="chip new"></i>新規方針</span>
+    <span><i class="chip today"></i>現在地</span>
+    <span style="color:var(--today)">▒ 計画停止期間</span>
+  </div>
+
+  <div class="tl">
+    <div class="axis" id="axis"><div class="cap">月 →</div></div>
+    <div class="lanes" id="lanes">
+      <div class="grid-overlay" id="gridOverlay"></div>
+    </div>
+  </div>
+
+  <div class="detail" id="detail">
+    <p class="empty">バーをクリックすると詳細が表示されます。</p>
+  </div>
+
+  <footer>
+    <span>Northwind Data Lakehouse — 自動生成ロードマップ</span>
+    <span>最終更新 2026-06-17</span>
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+// ── 時間軸: 2025-11 を idx0 とする14ヶ月 ──
+const MONTHS = ["25/11","25/12","26/01","26/02","26/03","26/04","26/05","26/06","26/07","26/08","26/09","26/10","26/11","26/12"];
+const N = MONTHS.length;
+
+// ラベル列(gutter)分を差し引いたトラック上に配置する calc ヘルパー
+const track = "(100% - var(--gutter))";
+const leftCss  = (idx)  => `calc(var(--gutter) + ${track} * ${idx / N})`;
+const widthCss = (span) => `calc(${track} * ${span / N})`;
+
+const TODAY = 7.57;        // 2026-06-17
+const OLD_END = 4.68;      // 2026-03-22 旧計画終了予定
+
+// ── レーン定義 ──
+const LANES = ["基盤・ガバナンス・BI", "ML・テスト・品質・CI/CD", "アプリ (EC / 業務管理)", "再編・新規方針"];
+
+// ── アイテム ──
+const ITEMS = [
+  { lane:0, label:"S1 自動化+ガバナンス", s:0, e:1.8, status:"done", period:"2025-11 〜 12",
+    detail:"Epic1 パイプライン冪等化・日次自動実行(Job/Job Cluster)・成否メール通知。並行で Epic2(2-1/2-2/2-5 ガバナンス)・Epic3(3-1〜3-5 メタデータ付与/検索/リネージ)・Epic8先行(重複DQ)。証跡＋sprint1結果報告書あり。" },
+  { lane:0, label:"S2 NAT / RAG・Genie", s:1.8, e:2.8, status:"done", period:"2025-11 〜 12",
+    detail:"Epic1 1-6 NAT Gateway時間制限運用(Lambda/CloudFormation)。Epic3 3-6 RAG/Genieによる自然言語データ探索の検証。証跡あり。" },
+  { lane:0, label:"BI (部分)", s:3, e:4, status:"partial", period:"2025-12 〜 2026-01",
+    detail:"Epic5 5-1 売上ダッシュボード・5-2 在庫ダッシュボードの実施手順書のみ存在。5-3(ML予測の可視化)・5-4(PDF/メール定期配信)・5-5(アクセス制御連携)は未実施。" },
+  { lane:1, label:"ML AutoML (PoC)", s:2, e:3, status:"partial", period:"2025-12",
+    detail:"Epic4 4-1 EDA・4-2 AutoMLベースライン生成は実施(証跡・サマリーあり)。4-3〜4-6(手動改善・MLflow比較・Registry・バッチ推論)は未。方針: PoCとしていったん打ち切り。" },
+  { lane:2, label:"Epic6 アプリ構築 (FastAPI+HTML/JS)", s:0.5, e:4, status:"done", period:"2025-11 〜 2026-02",
+    detail:"業務管理アプリ + ECストアを構築。現行は FastAPI + HTML/JS (src/)。旧Streamlit版は archive へ退避済み。コードは動作するが App-Sprint(AS1〜6)形式の証跡フォルダが無く、記録が実態に追従していない点に注意。" },
+  { lane:3, label:"ドキュメント整合・src整理", s:7, e:7.9, status:"progress", period:"2026-06（実施中）",
+    detail:"ER/テーブル設計の型誤り3件修正、概念データモデル新規作成、Streamlit版退避、アプリ設計書(システム/画面/E2E)を現行化、ログイン不具合修正、.env自動読込。← 今ここ。" },
+
+  // ── 再計画（未着手） ──
+  { lane:0, label:"ガバナンス完了", s:8, e:9.5, status:"planned", period:"再計画",
+    detail:"Epic2 残: 2-3 動的マスキングビュー(is_member)・2-4 細粒度権限・2-6〜2-8 アクセス制御の証明テストと証跡化。" },
+  { lane:0, label:"BI 完了", s:9.5, e:10.6, status:"planned", period:"再計画",
+    detail:"Epic5 残: 5-3 ML予測の可視化・5-4 PDF/メール定期配信(毎週月9時)・5-5 Epic2権限との連携テスト。Epic3 3-7〜3-9(ML/BI後のメタ追加更新)も併せて。" },
+  { lane:1, label:"テスト戦略 E7", s:8.4, e:10, status:"planned", period:"再計画",
+    detail:"Epic7 パイプライン単体/結合テスト(スタブ活用)・異常系DQ・クリーンアップ・Workflow自動実行・ops.test_results記録。" },
+  { lane:1, label:"DQ / Streaming E8", s:10, e:12, status:"planned", period:"再計画",
+    detail:"Epic8 DLTでBronze→Gold書き直し・Expectations宣言的品質・Auto Loader/Structured Streaming・手動テストとの比較ドキュメント。" },
+  { lane:1, label:"CI/CD・IaC E9", s:12, e:13.8, status:"planned", period:"再計画",
+    detail:"Epic9 DABsでJob/DLTをYAML化・GitHub Actions自動デプロイ・テストゲート・(発展)Terraformでクラスタ/UC権限をIaC化。" },
+  { lane:2, label:"アプリ結合/E2E テスト", s:8, e:9, status:"planned", period:"再計画",
+    detail:"App-Sprint5 7-7 結合(テスト専用RDSスキーマ)・7-8/7-9 E2E(全部本物: アプリ→RDS→ETL→Gold→ダッシュボード)。" },
+  { lane:2, label:"アプリ CI/CD・コンテナ", s:9, e:11, status:"planned", period:"再計画",
+    detail:"App-Sprint6 9-A1 Docker化/compose・9-A2 App Runner or ECS Fargate・9-A3/9-A4 GitHub Actions自動デプロイ+テストゲート。" },
+  { lane:3, label:"仕入システム 設計→実装", s:8.5, e:12.5, status:"new", period:"再計画（新規）", tag:"NEW",
+    detail:"商社のBuy-side。発注(購買PO)・入荷検品・在庫(独立化)エンティティを 概念データモデル→物理ER→アプリ の順で新設。配送は別システム化せず伝票の人手/バーコード取込前提。products の units_on_order/reorder_level を実際に動かす発注フローを実装。" },
+];
+
+// ── 軸描画 ──
+const axis = document.getElementById("axis");
+const gridOverlay = document.getElementById("gridOverlay");
+MONTHS.forEach((m, i) => {
+  const isQ = (i % 3 === 1); // 四半期目安で強調
+  const el = document.createElement("div");
+  el.className = "m" + (isQ ? " q" : "");
+  el.style.left = leftCss(i);
+  el.style.width = widthCss(1);
+  el.textContent = m;
+  axis.appendChild(el);
+
+  const gl = document.createElement("div");
+  gl.className = "gl" + (isQ ? " q" : "");
+  gl.style.left = leftCss(i);
+  gridOverlay.appendChild(gl);
+});
+
+// ── レーン + バー描画 ──
+const lanes = document.getElementById("lanes");
+const laneEls = LANES.map((name) => {
+  const lane = document.createElement("div");
+  lane.className = "lane";
+  const lbl = document.createElement("div");
+  lbl.className = "label";
+  lbl.textContent = name;
+  lane.appendChild(lbl);
+  lanes.appendChild(lane);
+  return lane;
+});
+
+const detail = document.getElementById("detail");
+const STATUS_LABEL = { done:"完了", partial:"部分/打ち切り", progress:"進行中", planned:"未着手", new:"新規方針" };
+const STATUS_COLOR = { done:"var(--done)", partial:"var(--partial)", progress:"var(--progress)", planned:"#7d8c9a", new:"var(--new)" };
+
+function showDetail(it) {
+  detail.replaceChildren();
+  const h = document.createElement("h3");
+  h.textContent = it.label;
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const lane = document.createElement("span");
+  const laneB = document.createElement("b"); laneB.textContent = LANES[it.lane];
+  lane.append("レーン: ", laneB);
+  const per = document.createElement("span");
+  const perB = document.createElement("b"); perB.textContent = it.period;
+  per.append("時期: ", perB);
+  const st = document.createElement("span");
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  badge.style.background = STATUS_COLOR[it.status];
+  badge.textContent = STATUS_LABEL[it.status];
+  st.append("状態: ", badge);
+  meta.append(lane, per, st);
+
+  const body = document.createElement("div");
+  body.className = "body";
+  body.textContent = it.detail;
+  detail.append(h, meta, body);
+}
+
+ITEMS.forEach((it) => {
+  const bar = document.createElement("div");
+  bar.className = "bar " + it.status;
+  bar.tabIndex = 0;
+  bar.style.left = leftCss(it.s);
+  bar.style.width = widthCss(it.e - it.s);
+  bar.title = it.label + " — " + STATUS_LABEL[it.status];
+
+  const dot = document.createElement("span"); dot.className = "dot";
+  bar.appendChild(dot);
+  const txt = document.createElement("span");
+  txt.textContent = it.label;
+  bar.appendChild(txt);
+  if (it.tag) { const t = document.createElement("span"); t.className = "tag"; t.textContent = it.tag; bar.appendChild(t); }
+  const rng = document.createElement("span"); rng.className = "range-m"; rng.textContent = it.period;
+  bar.appendChild(rng);
+
+  bar.addEventListener("click", () => showDetail(it));
+  bar.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showDetail(it); } });
+  laneEls[it.lane].appendChild(bar);
+});
+
+// ── 計画停止リージョン + today + マイルストン ──
+const stall = document.createElement("div");
+stall.className = "stall-region";
+stall.style.left = leftCss(OLD_END);
+stall.style.width = widthCss(TODAY - OLD_END);
+lanes.appendChild(stall);
+
+const today = document.createElement("div");
+today.className = "today-line";
+today.style.left = leftCss(TODAY);
+lanes.appendChild(today);
+
+const ms = document.createElement("div");
+ms.className = "mstone";
+ms.style.left = leftCss(OLD_END);
+ms.setAttribute("data-label", "旧計画終了予定 26/03/22");
+lanes.appendChild(ms);
+
+// ── サマリー集計 ──
+const count = (s) => ITEMS.filter((i) => i.status === s).length;
+document.getElementById("s-done").textContent = count("done");
+document.getElementById("s-partial").textContent = count("partial");
+document.getElementById("s-progress").textContent = count("progress");
+document.getElementById("s-planned").textContent = count("planned") + count("new");
+</script>
+</body>
+</html>

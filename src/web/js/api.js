@@ -48,8 +48,10 @@ const api = {
     });
 
     if (res.status === 401) {
-      // 認証切れ → ログインページへ
+      // 認証切れ → 無効トークンを破棄してからログインページへ。
+      // 破棄しないと「login がトークン有りと判断 → dashboard へ → 401 → login …」の無限ループになる。
       const isAdmin = window.location.pathname.includes('/admin/');
+      localStorage.removeItem(isAdmin ? this.ADMIN_TOKEN_KEY : this.STORE_TOKEN_KEY);
       window.location.href = isAdmin ? '/static/admin/login.html' : '/static/store/login.html';
       return;
     }
