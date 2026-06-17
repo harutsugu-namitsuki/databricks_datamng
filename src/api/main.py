@@ -84,7 +84,8 @@ class StoreLoginRequest(BaseModel):
 
 @app.post("/api/auth/admin")
 def admin_login(req: AdminLoginRequest):
-    user = ADMIN_USERS.get(req.username)
+    # 入力の自動大文字化やスペース混入に強くするため正規化する（ユーザー名は小文字で定義）
+    user = ADMIN_USERS.get(req.username.strip().lower())
     if not user or user["password"] != req.password:
         raise HTTPException(status_code=401, detail="ユーザー名またはパスワードが正しくありません")
     token = secrets.token_urlsafe(32)
@@ -94,13 +95,14 @@ def admin_login(req: AdminLoginRequest):
 
 @app.post("/api/auth/store")
 def store_login(req: StoreLoginRequest):
-    cid = req.customer_id.upper()
+    cid = req.customer_id.strip().upper()
     customer = fetch_one(
         "SELECT customer_id, company_name, contact_name, address, city, region, "
         "postal_code, country FROM customers WHERE customer_id = %s",
         (cid,),
     )
-    if not customer or req.password != cid:
+    # パスワード＝顧客ID（デモ）。大小文字・前後スペースを無視して照合する
+    if not customer or req.password.strip().upper() != cid:
         raise HTTPException(status_code=401, detail="顧客IDまたはパスワードが正しくありません")
     token = secrets.token_urlsafe(32)
     _sessions[token] = {"type": "store", "customer": dict(customer)}

@@ -1,0 +1,43 @@
+@startuml 注文連携シーケンス
+
+' EC ストアでの「注文確定」が RDS → データ基盤まで伝わる E2E シーケンス
+' 実装: src/api/main.py の create_order / src/web/store/checkout.html
+
+title EC 注文の E2E 連携シーケンス
+
+actor 顧客 as buyer
+participant "ブラウザ\n(store/checkout.html\n+ api.js)" as ui
+participant "FastAPI\n/api/orders" as api
+database "RDS PostgreSQL" as rds
+participant "日次 ETL\n(Databricks)" as etl
+participant "Gold マート\n/ BI" as gold
+
+== 同期：注文確定（リアルタイム） ==
+buyer -> ui : カート確定（配送先・配送業者）
+ui -> api : POST /api/orders\nBearer token + items
+api -> api : セッションから customer_id を取得\nstore ログイン必須（403 ガード）
+api -> rds : SELECT MAX(order_id)+1（採番）
+api -> rds : INSERT orders（ヘッダ）
+loop 明細ごと
+  api -> rds : INSERT order_details
+  api -> rds : UPDATE products\nunits_in_stock -= quantity（在庫減算）
+end
+api --> ui : { ok, order_id }
+ui --> buyer : 注文完了画面 → 履歴へ
+
+== 非同期：データ基盤への反映（日次バッチ） ==
+rds -> etl : JDBC 抽出（Bronze ingest）
+etl -> etl : Silver（クレンジング/型変換/DQ）
+etl -> etl : Gold（売上集計・サマリ）
+etl -> gold : sales_by_* / order_summary 更新
+gold --> buyer : （翌日以降）BI に売上反映\n在庫が発注点以下ならアラート
+
+note over api, rds
+  ⚠ 現状の簡易実装メモ
+  ・order_id は MAX+1 採番（同時注文で競合の可能性）
+  ・employee_id=1, freight=0, discount=0 を固定
+  ・複数 INSERT/UPDATE が単一トランザクションで
+    囲われていない（途中失敗時に部分反映の恐れ）
+end note
+
+@enduml

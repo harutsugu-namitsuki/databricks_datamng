@@ -1,0 +1,77 @@
+@startuml アプリ層アーキテクチャ
+
+' ════════════════════════════════════════════════════════════
+'  Northwind アプリ層 — 現行アーキテクチャ（FastAPI + HTML/JS）
+'  ※ 旧 Streamlit 版（:8501/:8502）は廃止し docs/archive/旧Streamlitアプリ/ へ退避済み
+' ════════════════════════════════════════════════════════════
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam rectangle {
+  BorderColor #555555
+}
+
+title Northwind アプリ層アーキテクチャ（FastAPI + HTML/JS 版）
+
+actor "顧客\n(B2Bバイヤー)" as buyer
+actor "社内担当者" as staff
+
+node "ブラウザ" as browser {
+  rectangle "EC ストア画面\n(web/store/*.html)\nlogin→catalog→cart→checkout→history" as store_ui
+  rectangle "業務管理画面\n(web/admin/*.html)\nlogin→dashboard/products/inventory/employees" as admin_ui
+  component "api.js\n(fetch ラッパー / カート / トークン保持)" as apijs
+}
+
+node "FastAPI サーバー\n(localhost:8000 / uvicorn)" as server {
+  component "静的配信\n/static → src/web" as static_mount
+  component "認証\n/api/auth/admin（メモリ固定アカウント）\n/api/auth/store（customers 照合）" as auth
+  component "業務API\nproducts / inventory / employees / dashboard" as admin_api
+  component "EC API\norders / order_details / products(在庫減算)" as store_api
+  component "db.py\n(psycopg2 / .env=load_dotenv)" as dbmod
+}
+
+database "RDS PostgreSQL\n(northwind / private subnet)" as rds {
+  rectangle "customers / products / orders\norder_details / employees ..." as tables
+}
+
+cloud "データ基盤（下流）" as lake {
+  rectangle "日次ETL\nBronze → Silver → Gold" as etl
+}
+
+' ── 利用者 → 画面 ──
+buyer --> store_ui
+staff --> admin_ui
+
+' ── 画面 → API（HTTP/JSON, fetch）──
+store_ui ..> apijs
+admin_ui ..> apijs
+apijs --> auth        : "HTTP\n(fetch /api/...)"
+apijs --> admin_api   : "HTTP\nBearer token"
+apijs --> store_api   : "HTTP\nBearer token"
+static_mount --> browser : "HTML/CSS/JS 配信"
+
+' ── API → DB ──
+auth --> dbmod
+admin_api --> dbmod
+store_api --> dbmod
+dbmod --> tables : "psycopg2\n(SELECT/INSERT/UPDATE)"
+
+' ── DB → データ基盤 ──
+tables --> etl : "JDBC（日次）"
+
+note right of auth
+  **認証の非対称性**
+  ・admin … メモリ上の固定アカウント
+    → DB 無しでもログイン可
+  ・store … customers テーブル照合
+    → DB 接続＋データ必須
+end note
+
+note bottom of etl
+  アプリの書き込み（注文・在庫・商品）は
+  日次 ETL で Gold まで反映され、
+  BI / 分析に流れる（別設計書）
+end note
+
+@enduml

@@ -108,7 +108,12 @@ Python 側（psycopg2）だけ**。だから「ブラウザ ⇄ DB」の間に**
 | `admin` | `admin123` | 管理者（個人情報を閲覧可） |
 | `staff` | `staff123` | スタッフ（個人情報はマスキング） |
 
-**EC ストア:** 顧客IDで認証（パスワード＝顧客ID）。例: `ALFKI` / `ALFKI`、`ANATR` / `ANATR`
+**EC ストア:** 専用のアカウント表はありません。**DB の `customers` テーブル（Northwind 顧客 91 社）がそのままログインアカウント**です。
+顧客ID で認証し、**パスワード＝顧客ID**（大小文字は不問）。例: `ALFKI` / `ALFKI`、`ANATR` / `ANATR`、`ANTON` / `ANTON`。
+
+> ⚠️ **EC ストアのログインには DB 接続が必須**です（業務管理はメモリ上の固定アカウントなので DB 無しでも入れますが、
+> EC ストアは `customers` を照合するため、DB が未接続／Northwind データ未ロードだと**どのIDでもログインできません**）。
+> 有効な顧客IDの一覧は `customers` テーブル、または [docs/design/data_platform/northwind.sql](../docs/design/data_platform/northwind.sql) の `INSERT INTO customers` を参照。
 
 ---
 
