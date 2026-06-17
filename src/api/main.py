@@ -6,6 +6,7 @@ RDS PostgreSQL を操作して JSON で返す。
 
 import secrets
 import datetime
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +19,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from api.db import fetch_all, fetch_one, execute
+from api import trace
 
 # ---------------------------------------------------------------------------
 # アプリ初期化
@@ -37,6 +39,44 @@ app.add_middleware(
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
+
+# ---------------------------------------------------------------------------
+# 操作トレース計装（全 /api リクエストを span 化。観測の副作用ゼロ: FR-T6）
+# ---------------------------------------------------------------------------
+
+@app.on_event("startup")
+async def _trace_bind_loop():
+    import asyncio
+    trace.bind_loop(asyncio.get_running_loop())
+
+
+@app.middleware("http")
+async def trace_middleware(request, call_next):
+    # フロントが付けた X-Trace-Id があれば 1クリックとして引き継ぐ。無ければ新規採番。
+    trace_id = request.headers.get("X-Trace-Id") or trace.new_trace_id()
+    trace.start_trace(trace_id)
+    t0 = time.perf_counter()
+    status = "ok"
+    try:
+        response = await call_next(request)
+        if response.status_code >= 400:
+            status = "error"
+        return response
+    except Exception:
+        status = "error"
+        raise
+    finally:
+        dur = (time.perf_counter() - t0) * 1000
+        path = request.url.path
+        # 静的配信や /trace 自身は記録しない（ノイズ・自己観測ループ防止）
+        if path.startswith("/api"):
+            trace.record(trace.make_span(
+                "http", path, "http",
+                detail=f"{request.method} {path}",
+                dur_ms=dur,
+                status=status,
+            ))
+
 # ---------------------------------------------------------------------------
 # 簡易認証 (トークン → ユーザー情報 のメモリキャッシュ)
 # ---------------------------------------------------------------------------
@@ -52,11 +92,17 @@ ADMIN_USERS = {
 def _require_token(authorization: str = Header(...)) -> dict:
     """Authorization: Bearer <token> からセッション情報を取り出す。"""
     if not authorization.startswith("Bearer "):
+        trace.record(trace.make_span("auth", "_require_token", "auth",
+                                     detail="形式不正", status="error"))
         raise HTTPException(status_code=401, detail="認証が必要です")
     token = authorization[7:]
     session = _sessions.get(token)
     if not session:
+        trace.record(trace.make_span("auth", "_require_token", "auth",
+                                     detail="トークン無効", status="error"))
         raise HTTPException(status_code=401, detail="トークンが無効または期限切れです")
+    trace.record(trace.make_span("auth", "_require_token", "auth",
+                                 detail="認証OK", status="ok"))
     return session
 
 
