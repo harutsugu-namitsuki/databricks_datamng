@@ -17,7 +17,10 @@ with TestClient(app) as client:
     assert len(m["nodes"]) == 21, len(m["nodes"])
     assert len(m["edges"]) == 24, len(m["edges"])
     assert "detail" in m["nodes"]["fetch"], "node detail missing"
-    assert client.get("/trace/rollup?window=1h").json() == []  # スタブ
+    # /trace/rollup は list を返す（起動時 ingest 済みなら中身あり）。各要素の形を確認。
+    rj = client.get("/trace/rollup?window=1h").json()
+    assert isinstance(rj, list)
+    assert all({"edge", "count", "avg_ms"} <= set(x) for x in rj), rj
 
 
 # --- SSE 配信経路：subscribe → record → 購読キューに届く ---

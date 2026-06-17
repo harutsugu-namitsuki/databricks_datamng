@@ -52,6 +52,8 @@ app.include_router(trace_router)
 async def _trace_bind_loop():
     import asyncio
     trace.bind_loop(asyncio.get_running_loop())
+    trace.purge_old(days=7)        # 古い生イベントを削除（NFR-O2）
+    trace.ingest_events()          # 当日までの集計を復元（FR-S2 起動時集計）
 
 
 @app.middleware("http")

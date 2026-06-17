@@ -155,12 +155,158 @@ def unsubscribe(q: asyncio.Queue) -> None:
     _subscribers.discard(q)
 
 
-# Task 6.1 までの暫定スタブ（後で本実装に置換）
+# ---------------------------------------------------------------------------
+# ロールアップ集計（スパン → 地図ノード → 地図エッジを時間バケットで計数）
+# 可視化ビューと同一の full-path ロジックでエッジを点灯・計数し、履歴の
+# エッジ ID（"from>to"）がビューの地図エッジと一致するようにする。
+# ---------------------------------------------------------------------------
+
+_MAP_PATH = _DATA_DIR.parent / "src" / "api" / "trace_map.json"
+if not _MAP_PATH.exists():  # db.py 基準(parents[2]=repo root)からの絶対化に失敗した場合の保険
+    _MAP_PATH = Path(__file__).resolve().parent / "trace_map.json"
+
+
+def _load_map() -> dict:
+    try:
+        return json.loads(_MAP_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {"nodes": {}, "edges": [], "routes": {}, "pages": {}}
+
+
+_MAP = _load_map()
+_EDGES = [tuple(e) for e in _MAP.get("edges", [])]
+_LABEL2ID = {v["label"]: k for k, v in _MAP.get("nodes", {}).items()}
+
+_WINDOW_SECS = {"10m": 600, "1h": 3600, "1d": 86400,
+                "1w": 604800, "1m": 2592000, "1y": 31536000}
+
+# (edge, minute_bucket) -> [count, dur_sum]
+_edge_buckets: dict[tuple[str, int], list] = {}
+# trace_id -> {"nodes": set, "edges": set(counted), "last": epoch}
+_trace_state: dict[str, dict] = {}
+
+
+def _nodes_for_span(span: dict) -> set:
+    """1スパンが点灯させる地図ノード id 群（ビューの nodesForSpan と同一規則）。"""
+    nodes: set = set()
+    kind = span.get("kind")
+    node = span.get("node", "")
+    routes = _MAP.get("routes", {})
+    pages = _MAP.get("pages", {})
+    if kind == "http":
+        screen = pages.get(span.get("page", ""))
+        if screen:
+            nodes.add(screen)
+        nodes.add("fetch")
+        nodes.add("cors")
+        handler = routes.get(node)
+        if not handler:  # 完全一致が無ければ最長プレフィックス
+            cand = [k for k in routes if node.startswith(k)]
+            if cand:
+                handler = routes[max(cand, key=len)]
+        if handler:
+            nodes.add(handler)
+    elif kind == "auth":
+        nodes.add("auth")
+    elif kind == "sql":
+        nodes.add("db")
+        nodes.add("pg")
+        for name in span.get("tables", []):
+            nid = _LABEL2ID.get(name)
+            if not nid and ("t_" + name) in _MAP.get("nodes", {}):
+                nid = "t_" + name
+            if nid:
+                nodes.add(nid)
+    return nodes
+
+
+def _span_minute(span: dict) -> int:
+    """スパンの発生時刻を分バケット(epoch//60)に。replay でも正しい窓に入るよう ts を使う。"""
+    try:
+        return int(datetime.fromisoformat(span["ts"]).timestamp() // 60)
+    except Exception:
+        return int(time.time() // 60)
+
+
 def _rollup_accumulate(span: dict) -> None:
-    pass
+    """同一トレースのスパンを貯め、両端が点灯した地図エッジを 1 回だけ計数する。"""
+    try:
+        tid = span.get("trace_id")
+        if not tid:
+            return
+        st = _trace_state.get(tid)
+        if st is None:
+            st = {"nodes": set(), "edges": set(), "last": time.time()}
+            _trace_state[tid] = st
+        st["nodes"].update(_nodes_for_span(span))
+        st["last"] = time.time()
+        minute = _span_minute(span)
+        dur = span.get("dur_ms", 0.0) or 0.0
+        lit = st["nodes"]
+        for a, b in _EDGES:
+            if a in lit and b in lit:
+                edge = f"{a}>{b}"
+                if edge not in st["edges"]:
+                    st["edges"].add(edge)
+                    bk = _edge_buckets.setdefault((edge, minute), [0, 0.0])
+                    bk[0] += 1
+                    bk[1] += dur
+        # 古いトレース状態を間引く（メモリ抑制）
+        now = time.time()
+        for t in [t for t, s in _trace_state.items() if now - s["last"] > 120]:
+            _trace_state.pop(t, None)
+    except Exception:
+        pass
 
 
 def rollup_for(window: str) -> list[dict]:
-    """指定時間窓のエッジ別通過量を返す。Task 6.1 で本実装。
-    それまでは空配列（/trace/rollup を壊さないためのスタブ）。"""
-    return []
+    """指定時間窓のエッジ別通過量（進行中バケットも含む: FR-S2）。"""
+    secs = _WINDOW_SECS.get(window, 3600)
+    cutoff = int((time.time() - secs) // 60)
+    agg: dict[str, list] = {}
+    for (edge, minute), (cnt, dur) in list(_edge_buckets.items()):
+        if minute >= cutoff:
+            a = agg.setdefault(edge, [0, 0.0])
+            a[0] += cnt
+            a[1] += dur
+    return [{"edge": e, "count": c, "avg_ms": round(d / c, 2) if c else 0.0}
+            for e, (c, d) in agg.items()]
+
+
+def _rollup_reset() -> None:
+    """テスト用初期化。"""
+    _edge_buckets.clear()
+    _trace_state.clear()
+
+
+def ingest_events() -> int:
+    """起動時に保持中の全 events-*.jsonl を読み、ロールアップを復元（FR-S2 起動時集計）。"""
+    n = 0
+    try:
+        for p in sorted(_DATA_DIR.glob("events-*.jsonl")):
+            for line in p.read_text(encoding="utf-8").splitlines():
+                try:
+                    _rollup_accumulate(json.loads(line))
+                    n += 1
+                except Exception:
+                    continue
+        _trace_state.clear()  # 復元後は per-trace 状態を破棄（以降の生計数と独立）
+    except Exception:
+        pass
+    return n
+
+
+def purge_old(days: int = 7) -> None:
+    """保持期間を超えた古い events-*.jsonl を削除（NFR-O2）。"""
+    try:
+        import datetime as _dt
+        cutoff = _dt.date.today() - _dt.timedelta(days=days)
+        for p in _DATA_DIR.glob("events-*.jsonl"):
+            try:
+                d = _dt.datetime.strptime(p.stem.replace("events-", ""), "%Y%m%d").date()
+                if d < cutoff:
+                    p.unlink()
+            except Exception:
+                continue
+    except Exception:
+        pass
