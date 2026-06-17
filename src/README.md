@@ -44,6 +44,22 @@ uvicorn api.main:app --reload --port 8000
 > ⚠️ **必ず `src/` ディレクトリ内で起動**してください（`api.main:app` のパス解決のため）。
 > 既に `src/` にいるなら `cd src` は不要です（二重で潜るとパスが見つからずエラーになります）。
 
+### ラク起動（ローカル開発・推奨）
+
+毎回 `cmd` を打たなくても、リポジトリ直下の **ダブルクリック起動 .bat** で済みます。
+
+| ファイル | 役割 |
+|---|---|
+| `load_northwind.bat` | **初回のみ。** ローカル PostgreSQL に `northwind` DB を作成し、`docs/design/data_platform/northwind.sql`（本番 RDS と同一データ）をロード。psql は自動検出 |
+| `start_store.bat` | サーバー起動 → 自動で **EC ストア** ログイン画面を開く |
+| `start_admin.bat` | サーバー起動 → 自動で **業務管理** ログイン画面を開く |
+
+**前提（ローカル開発時）:** ローカル PostgreSQL を入れ、super パスワードを `postgres` にしておくと
+[api/db.py](api/db.py) の既定値（`localhost / northwind / postgres / postgres`）に一致するため **`.env` 不要**。
+別パスワードにした場合のみ `.env`（と `load_northwind.bat` の `PGPASSWORD`）を合わせる。
+
+> サーバーは別ウィンドウで動き続けます。止めるときはそのウィンドウを閉じる（または `Ctrl+C`）。
+
 ### DB 接続情報について
 
 [api/db.py](api/db.py) が起動時に **リポジトリ直下の `.env` を自動で読み込みます**

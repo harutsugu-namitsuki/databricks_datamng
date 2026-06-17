@@ -18,7 +18,8 @@
       "WebFetch(domain:databricks.aimpointdigital.com)",
       "WebFetch(domain:qiita.com)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "Read(//c/Users/YuenongMei\\(梅月濃\\)/.claude/skills/subagent-driven-development/**)"
     ],
     "deny": [
       "Bash(rm *)",
