@@ -166,10 +166,10 @@
     "cors": {
       "col": 2,
       "label": "CORS MW",
-      "sub": "main.py:29",
+      "sub": "main.py",
       "detail": {
         "k": "ミドルウェア（門番）",
-        "f": "src/api/main.py:29 CORSMiddleware",
+        "f": "src/api/main.py CORSMiddleware",
         "one": "サーバーの“受付・門番”。届いた通信を最初に検査する共通処理。",
         "easy": "<span class='term' title='本来の処理に届く前に必ず通る共通の“関所”'>ミドルウェア</span>は、依頼が担当者に届く前に必ず通る“通路の関所”です。<span class='term' title='違うWebサイト間の通信を許可/制限するブラウザの安全ルール'>CORS</span>は「どのWebサイトからのアクセスならOKか」を判断する安全装置で、<b>悪意あるサイトから勝手にデータを抜かれるのを防ぎます</b>。開発中は全部許可していますが、本番では絞ります。",
         "terms": [
@@ -202,7 +202,7 @@
       "sub": "Bearer照合",
       "detail": {
         "k": "認証（改札）",
-        "f": "src/api/main.py:52 _require_token",
+        "f": "src/api/main.py _require_token",
         "one": "通行証（トークン）を確認する“改札”。",
         "easy": "在庫変更や注文など<b>“誰がやったか”が重要な操作の前に立つ改札</b>です。通信に添えられたトークンが、サーバーが覚えているログイン情報（<span class='term' title='ログイン中という状態をサーバー側で記憶していること'>セッション</span>）と一致するか照合します。不一致なら門前払い（<span class='term' title='「認証が必要・失敗」を表すHTTPの番号'>401エラー</span>）。逆に商品一覧のような“誰でも見てよい”<span class='term' title='ログイン無しで誰でも呼べる窓口'>公開API</span>はこの改札を通りません。モックで🛒や🔑が認証ノードを飛ばすのはこのためです。",
         "terms": [
@@ -235,7 +235,7 @@
       "sub": "GET /api/products",
       "detail": {
         "k": "APIハンドラ（担当プログラム）",
-        "f": "src/api/main.py:125 list_products()",
+        "f": "src/api/main.py list_products()",
         "one": "「商品一覧ください」に応える担当プログラム（関数）。",
         "easy": "<span class='term' title='“この住所に頼めばこの仕事をする”という窓口。例 /api/products'>エンドポイント</span> /api/products に来た依頼を受け、データベースへ「商品＋カテゴリ＋仕入先をひとまとめにして」と問い合わせる<span class='term' title='データベースに命令する専用の言語'>SQL</span>を組み立てます。複数の表を“のりづけ”して1つの結果にすることを<span class='term' title='複数の表を共通項目でつなげる操作'>JOIN（結合）</span>と言います。",
         "terms": [
@@ -269,7 +269,7 @@
       "sub": "POST /inventory/adjust",
       "detail": {
         "k": "APIハンドラ（担当プログラム）",
-        "f": "src/api/main.py:199 adjust_stock()",
+        "f": "src/api/main.py adjust_stock()",
         "one": "在庫数を増やす/減らす担当プログラム（要ログイン）。",
         "easy": "まず現在の在庫を<span class='term' title='データを読み出すSQL命令'>SELECT</span>で読み、増減後の値を計算し、<b>マイナスにならないか確認(<span class='term' title='入力や結果が正しいか検査すること'>バリデーション</span>)してから</b><span class='term' title='既存データを書き換えるSQL命令'>UPDATE</span>で書き換えます。“読んでから書く”の2段構えです。",
         "terms": [
@@ -298,7 +298,7 @@
       "sub": "POST /api/orders",
       "detail": {
         "k": "APIハンドラ（担当プログラム）",
-        "f": "src/api/main.py:290 create_order()",
+        "f": "src/api/main.py create_order()",
         "one": "注文を確定し、在庫を減らす担当プログラム（システムで一番“重い”処理）。",
         "easy": "1回の注文で複数のことが連鎖します：注文ヘッダを作り(<span class='term' title='新しいデータを追加するSQL命令'>INSERT</span> orders)、商品ごとに<span class='term' title='注文内の商品1行ごとの内訳'>明細</span>を作り(INSERT order_details)、その分だけ在庫を減らす(UPDATE products)。本来はこれらが<b>全部成功するか・全部取り消すか</b>をまとめる<span class='term' title='一連の書き込みを“全部成功 or 全部なかったこと”にする仕組み'>トランザクション</span>が重要になります。",
         "terms": [
@@ -327,7 +327,7 @@
       "sub": "GET /api/dashboard",
       "detail": {
         "k": "APIハンドラ（担当プログラム）",
-        "f": "src/api/main.py:358 dashboard()",
+        "f": "src/api/main.py dashboard()",
         "one": "ダッシュボード1画面分の数字をまとめて作る担当プログラム。",
         "easy": "商品数・注文数・在庫アラート・最近の注文…を、<b>複数のSQLを連続実行</b>して1つのまとまり(<span class='term' title='プログラム間でデータを受け渡す軽量な書式'>JSON</span>)にして返します。1クリックが多数の問い合わせを生む典型で、「1操作＝1トレース」で束ねる意味がよく分かる箇所です。",
         "terms": [
@@ -356,7 +356,7 @@
       "sub": "POST /auth/store",
       "detail": {
         "k": "APIハンドラ（担当プログラム）",
-        "f": "src/api/main.py:96 store_login()",
+        "f": "src/api/main.py store_login()",
         "one": "ログインの可否を判定し、通行証を“発行”する担当プログラム。",
         "easy": "送られた顧客IDが customers 表にあるか<span class='term' title='入力が登録内容と一致するか突き合わせること'>照合</span>し、合っていればトークンを作って返します。<b>“改札(認証)”が通行証を『確認』する側なのに対し、ここは通行証を『発行』する側</b>。役割が逆なので、認証ノードを通らずに認証情報を作ります。",
         "terms": [
