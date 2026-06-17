@@ -18,5 +18,11 @@ check("INSERT INTO orders (order_id) VALUES (%s)", ["orders"])
 check("UPDATE products SET units_in_stock=%s WHERE product_id=%s", ["products"])
 # 抽出不能 → 「不明」（要件 FR-T4）
 check("SELECT 1", ["不明"])
+# スキーマ修飾は落としてテーブル名だけ
+check("SELECT * FROM public.products", ["products"])
+# 重複排除
+check("SELECT * FROM a JOIN a ON 1=1", ["a"])
+# ダブルクオート識別子（空白入り）
+check('SELECT * FROM "Order Details"', ["Order Details"])
 
 print("OK: extract_tables")
