@@ -158,3 +158,9 @@ def unsubscribe(q: asyncio.Queue) -> None:
 # Task 6.1 までの暫定スタブ（後で本実装に置換）
 def _rollup_accumulate(span: dict) -> None:
     pass
+
+
+def rollup_for(window: str) -> list[dict]:
+    """指定時間窓のエッジ別通過量を返す。Task 6.1 で本実装。
+    それまでは空配列（/trace/rollup を壊さないためのスタブ）。"""
+    return []

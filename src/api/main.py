@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from api.db import fetch_all, fetch_one, execute
 from api import trace
+from api.trace_routes import router as trace_router
 
 # ---------------------------------------------------------------------------
 # アプリ初期化
@@ -38,6 +39,9 @@ app.add_middleware(
 # 静的ファイル (HTML/CSS/JS) を /static で配信
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
+
+# 可視化ビュー向け API（/trace/map・/trace/stream・/trace/rollup）
+app.include_router(trace_router)
 
 
 # ---------------------------------------------------------------------------
