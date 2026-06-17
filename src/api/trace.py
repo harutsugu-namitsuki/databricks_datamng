@@ -9,7 +9,16 @@
 計測の失敗は決して被観測アプリを止めない（要件 FR-T6 / NFR-R1）。
 """
 
+import asyncio
+import contextvars
+import itertools
+import json
 import re
+import threading
+import time
+import uuid
+from datetime import datetime
+from pathlib import Path
 
 # FROM / JOIN / INTO / UPDATE の直後に来るテーブル名を拾う。
 # ダブルクオート識別子（"Order Details" 等）または通常識別子を捕捉し、
@@ -41,11 +50,6 @@ def extract_tables(sql: str) -> list[str]:
 # span モデルと contextvar による「現在のトレース」管理
 # ---------------------------------------------------------------------------
 
-import contextvars
-import itertools
-import time
-import uuid
-
 # 現在処理中のトレース文脈（middleware が設定、db.py 計装が参照）。
 # async→threadpool 間も contextvars はコピーされるため sync エンドポイントからも見える。
 _current = contextvars.ContextVar("trace_ctx", default=None)
@@ -56,7 +60,6 @@ class TraceCtx:
     def __init__(self, trace_id: str):
         self.trace_id = trace_id
         self._seq = itertools.count(1)
-        self.last_span_id = "root"
 
     def next_span_id(self) -> str:
         return f"s{next(self._seq):03d}"
@@ -84,8 +87,7 @@ def make_span(layer: str, node: str, kind: str, *, detail: str = "",
         "trace_id": ctx.trace_id if ctx else new_trace_id(),
         "span_id": ctx.next_span_id() if ctx else "s001",
         "parent_span_id": parent,
-        "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()) +
-              f".{int((time.time() % 1) * 1000):03d}",
+        "ts": datetime.now().isoformat(timespec="milliseconds"),
         "layer": layer, "node": node, "kind": kind,
         "detail": detail, "tables": tables or [], "dur_ms": round(dur_ms, 2),
         "status": status,
@@ -95,11 +97,6 @@ def make_span(layer: str, node: str, kind: str, *, detail: str = "",
 # ---------------------------------------------------------------------------
 # JSONL 追記コレクタ ＋ SSE pub/sub（スレッド安全）
 # ---------------------------------------------------------------------------
-
-import asyncio
-import json
-import threading
-from pathlib import Path
 
 # 出力先: リポジトリ直下 trace_data/（db.py と同じ parents[2] 基準）
 _DATA_DIR = Path(__file__).resolve().parents[2] / "trace_data"
@@ -146,6 +143,9 @@ def _publish(span: dict) -> None:
 
 
 def subscribe() -> asyncio.Queue:
+    # subscribe/unsubscribe はイベントループ側スレッドで呼ばれ、_publish は
+    # list(_subscribers) のスナップショットを取って worker thread から読むため、
+    # 集合の更新にロックは不要（反復中の変更影響を受けない）。
     q: asyncio.Queue = asyncio.Queue(maxsize=1000)
     _subscribers.add(q)
     return q
