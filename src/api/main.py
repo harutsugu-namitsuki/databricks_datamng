@@ -77,14 +77,29 @@ async def trace_middleware(request, call_next):
     finally:
         dur = (time.perf_counter() - t0) * 1000
         path = request.url.path
-        # 静的配信や /trace 自身は記録しない（ノイズ・自己観測ループ防止）
+        # 参照元画面は Referer の末尾2セグメント（例 store/catalog.html）。
+        # store/admin で同名の login.html を区別するためファイル名だけにしない。
+        ref = request.headers.get("referer", "")
+        page = ""
+        if ref:
+            segs = ref.split("?")[0].rstrip("/").split("/")
+            page = "/".join(segs[-2:]) if len(segs) >= 2 else segs[-1]
         if path.startswith("/api"):
-            # 参照元画面（Referer のファイル名）を載せる＝可視化で画面ノードを点灯するため
-            ref = request.headers.get("referer", "")
-            page = ref.rsplit("/", 1)[-1].split("?")[0] if ref else ""
             span = trace.make_span(
                 "http", path, "http",
                 detail=f"{request.method} {path}",
+                dur_ms=dur,
+                status=status,
+            )
+            span["page"] = page
+            span["method"] = request.method  # メソッド+パスでハンドラを正確に照合
+            trace.record(span)
+        elif path.startswith("/static/img"):
+            # 商品画像の静的配信（ブラウザ<img>→StaticFiles→ファイルシステム）も計測対象に。
+            # <img> は fetch を通らないため trace_id は付かず、各画像が独立トレースになる。
+            span = trace.make_span(
+                "img", "img_static", "img",
+                detail=f"GET {path}",
                 dur_ms=dur,
                 status=status,
             )

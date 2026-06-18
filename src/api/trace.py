@@ -199,11 +199,7 @@ def _nodes_for_span(span: dict) -> set:
             nodes.add(screen)
         nodes.add("fetch")
         nodes.add("cors")
-        handler = routes.get(node)
-        if not handler:  # 完全一致が無ければ最長プレフィックス
-            cand = [k for k in routes if node.startswith(k)]
-            if cand:
-                handler = routes[max(cand, key=len)]
+        handler = _route_handler(node, span.get("method", ""), routes)
         if handler:
             nodes.add(handler)
     elif kind == "auth":
@@ -217,7 +213,32 @@ def _nodes_for_span(span: dict) -> set:
                 nid = "t_" + name
             if nid:
                 nodes.add(nid)
+    elif kind == "img":
+        # 画像の静的配信：画面 → 静的配信 → 画像ファイル
+        screen = pages.get(span.get("page", ""))
+        if screen:
+            nodes.add(screen)
+        if "img_static" in _MAP.get("nodes", {}):
+            nodes.add("img_static")
+        if "img_file" in _MAP.get("nodes", {}):
+            nodes.add("img_file")
     return nodes
+
+
+def _route_handler(path: str, method: str, routes: dict) -> "str | None":
+    """ルートキー "METHOD /path" を method+path で照合（viewer.js routeHandler と同一規則）。"""
+    exact = routes.get(f"{method} {path}")
+    if exact:
+        return exact
+    best, best_len = None, -1
+    for key, v in routes.items():
+        sp = key.find(" ")
+        m, p = key[:sp], key[sp + 1:]
+        if method and m != method:
+            continue
+        if path.startswith(p) and len(p) > best_len:
+            best, best_len = v, len(p)
+    return best
 
 
 def _span_minute(span: dict) -> int:

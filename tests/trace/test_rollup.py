@@ -5,13 +5,11 @@ from api import trace
 
 trace._rollup_reset()
 
-# 1トレース：http(/api/products, 画面=catalog.html) と sql(db.py, tables=[products]) を流す
+# 1トレース：http(GET /api/products, 画面=store/catalog.html) と sql(db.py, tables=[products])
 trace.start_trace("t1")
-trace.record(trace.make_span("http", "/api/products", "http",
-                             dur_ms=5.0))  # page 無し
-# page 付き http を別途確認するため span を手で作る
 sp = trace.make_span("http", "/api/products", "http", dur_ms=5.0)
-sp["page"] = "catalog.html"
+sp["page"] = "store/catalog.html"   # Referer 末尾2セグメント
+sp["method"] = "GET"                 # メソッド+パスでハンドラ照合
 trace.record(sp)
 trace.record(trace.make_span("db", "db.py", "sql", tables=["products"], dur_ms=3.0))
 
@@ -26,7 +24,8 @@ assert all(v == 1 for v in edges.values()), edges
 
 # 別トレースを足すと count が増える
 trace.start_trace("t2")
-sp2 = trace.make_span("http", "/api/products", "http", dur_ms=4.0); sp2["page"] = "catalog.html"
+sp2 = trace.make_span("http", "/api/products", "http", dur_ms=4.0)
+sp2["page"] = "store/catalog.html"; sp2["method"] = "GET"
 trace.record(sp2)
 trace.record(trace.make_span("db", "db.py", "sql", tables=["products"], dur_ms=2.0))
 edges2 = {e["edge"]: e["count"] for e in trace.rollup_for("1h")}

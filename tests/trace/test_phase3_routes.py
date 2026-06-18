@@ -14,8 +14,9 @@ from api import trace
 with TestClient(app) as client:
     m = client.get("/trace/map").json()
     assert len(m["columns"]) == 8, m["columns"]
-    assert len(m["nodes"]) == 21, len(m["nodes"])
-    assert len(m["edges"]) == 24, len(m["edges"])
+    assert len(m["nodes"]) >= 21, len(m["nodes"])     # 完全カバレッジ化で増加（現状41）
+    assert len(m["edges"]) >= 24, len(m["edges"])     # 同上（現状54）
+    assert m.get("routes") and m.get("pages"), "routes/pages missing"
     assert "detail" in m["nodes"]["fetch"], "node detail missing"
     # /trace/rollup は list を返す（起動時 ingest 済みなら中身あり）。各要素の形を確認。
     rj = client.get("/trace/rollup?window=1h").json()

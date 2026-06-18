@@ -233,11 +233,18 @@ function lightTrace(nodeIds, color) {
 const TTL = 3000;
 const traces = new Map(); // trace_id -> { nodes:Set, error:bool, steps:[], t:timestamp }
 
-function routeHandler(path) {
-  if (ROUTES[path]) return ROUTES[path];                  // 完全一致
-  let best = null, bestLen = -1;                           // 最長プレフィックス一致
+// ルートキーは "METHOD /path"。メソッド+パスで照合し、誤ラベル（GET/POST 取り違え）を防ぐ。
+// 末尾"/"のキーはパスパラメータ（例 "GET /api/employees/" が /api/employees/3 に一致）。
+function routeHandler(span) {
+  const path = span.node, method = span.method || "";
+  const exact = ROUTES[method + " " + path];
+  if (exact) return exact;
+  let best = null, bestLen = -1;
   for (const key in ROUTES) {
-    if (path.indexOf(key) === 0 && key.length > bestLen) { best = ROUTES[key]; bestLen = key.length; }
+    const sp = key.indexOf(" ");
+    const m = key.slice(0, sp), p = key.slice(sp + 1);
+    if (method && m !== method) continue;
+    if (path.indexOf(p) === 0 && p.length > bestLen) { best = ROUTES[key]; bestLen = p.length; }
   }
   return best;
 }
@@ -254,7 +261,7 @@ function nodesForSpan(span) {
     if (span.page && PAGES[span.page]) ids.push(PAGES[span.page]);
     if (N["fetch"]) ids.push("fetch");
     if (N["cors"]) ids.push("cors");
-    const h = routeHandler(span.node);
+    const h = routeHandler(span);
     if (h && N[h]) ids.push(h);
   } else if (span.kind === "auth") {
     if (N["auth"]) ids.push("auth");
@@ -262,14 +269,20 @@ function nodesForSpan(span) {
     if (N["db"]) ids.push("db");
     if (N["pg"]) ids.push("pg");
     (span.tables || []).forEach(name => { const tid = tableNodeId(name); if (tid) ids.push(tid); });
+  } else if (span.kind === "img") {
+    // 商品画像の静的配信：画面 → 静的配信 → 画像ファイル
+    if (span.page && PAGES[span.page]) ids.push(PAGES[span.page]);
+    if (N["img_static"]) ids.push("img_static");
+    if (N["img_file"]) ids.push("img_file");
   }
   return ids;
 }
 
 function stepLabel(span) {
-  if (span.kind === "http") return `HTTP ${span.node}` + (span.page ? ` (${span.page})` : "");
+  if (span.kind === "http") return `HTTP ${span.method ? span.method + " " : ""}${span.node}` + (span.page ? ` (${span.page})` : "");
   if (span.kind === "auth") return `認証 ${span.node}`;
   if (span.kind === "sql") return `SQL ${(span.tables || []).join(", ") || span.node}`;
+  if (span.kind === "img") return `画像配信 ${span.node}` + (span.page ? ` (${span.page})` : "");
   return span.kind + " " + (span.node || "");
 }
 
