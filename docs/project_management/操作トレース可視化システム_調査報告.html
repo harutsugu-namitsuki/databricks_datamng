@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>操作トレース可視化システム 調査報告</title>
+<style>
+  :root{
+    --bg:#0f141b; --panel:#161b22; --panel2:#1b2230; --line:#2b333f;
+    --txt:#e6edf3; --muted:#9aa6b2; --teal:#2dd4bf; --err:#f85149;
+    --warn:#d29922; --ok:#3fb950; --accent:#58a6ff;
+    --mono:Consolas,"SFMono-Regular",Menlo,monospace;
+    --sans:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--sans);line-height:1.75}
+  .wrap{display:flex;max-width:1180px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:flex-start;height:100vh;overflow:auto;
+    width:230px;padding:24px 14px;border-right:1px solid var(--line);font-size:13px}
+  nav h2{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 0 10px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:4px 8px;border-radius:6px;margin:2px 0}
+  nav a:hover{background:var(--panel2);color:var(--txt)}
+  main{flex:1;min-width:0;padding:32px 30px 80px}
+  h1{font-size:24px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 22px}
+  h2.sec{font-size:19px;margin:34px 0 10px;padding-top:10px;border-top:1px solid var(--line)}
+  h3{font-size:15px;margin:20px 0 6px;color:#cdd9e5}
+  p{margin:8px 0}
+  code{font-family:var(--mono);background:#0b0f14;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:#a5d6ff}
+  .tldr{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0 10px 10px 0;padding:14px 18px;margin:8px 0 10px}
+  .tldr ol{margin:6px 0 0;padding-left:20px}
+  .tldr li{margin:6px 0}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#cdd9e5;font-weight:600}
+  tr:nth-child(even) td{background:#12181f}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;white-space:nowrap}
+  .ok{background:rgba(63,185,80,.16);color:var(--ok);border:1px solid var(--ok)}
+  .warn{background:rgba(210,153,34,.16);color:var(--warn);border:1px solid var(--warn)}
+  .bad{background:rgba(248,81,73,.16);color:var(--err);border:1px solid var(--err)}
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card.before{border-left:4px solid var(--err)}
+  .card.after{border-left:4px solid var(--ok)}
+  .card h4{margin:0 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  pre{background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-family:var(--mono);font-size:12px;color:#cdd9e5;line-height:1.55}
+  .flow{background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;color:#cdd9e5;overflow:auto}
+  .key{color:var(--teal)}
+  .dead{color:var(--err)}
+  .note{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:12px 0;font-size:13.5px}
+  .rec{background:rgba(45,212,191,.08);border:1px solid var(--teal);border-radius:10px;padding:12px 16px;margin:12px 0}
+  footer{margin-top:40px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:12px}
+  footer code{font-size:11px}
+  @media(max-width:820px){.wrap{display:block}nav{position:static;width:auto;height:auto;border-right:none;border-bottom:1px solid var(--line)}.ba{grid-template-columns:1fr}main{padding:20px}}
+  @media print{nav{display:none}body{background:#fff;color:#000}.card,.tldr,.note,.rec,pre,.flow{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <h2>目次</h2>
+  <a href="#tldr">TL;DR（4つの所見）</a>
+  <a href="#s1">① 反復再生 before/after</a>
+  <a href="#s2">② 「3秒で消える」真因</a>
+  <a href="#s3">③ マップ網羅性の真因</a>
+  <a href="#s3a">　画面カバレッジ</a>
+  <a href="#s3b">　エンドポイント→ハンドラ</a>
+  <a href="#s3c">　テーブル</a>
+  <a href="#s3d">　商品画像コンポーネント</a>
+  <a href="#s4">④ 推奨対応</a>
+  <a href="#rec">記録先・出典</a>
+</nav>
+<main>
+  <h1>操作トレース可視化システム 調査報告</h1>
+  <p class="sub">追加要件（反復再生）の before/after、「3秒で消える」不具合の真因、そしてマップ網羅性の真因調査と横並び点検。— 一度読んで腑に落ちることを狙った人間向け資料。</p>
+
+  <div class="tldr" id="tldr">
+    <b>TL;DR（結論を先に）</b>
+    <ol>
+      <li><b>反復再生</b>は実装済み。経路は「1回流れて消える」から「<b>次の操作が来るまで粒子の波を繰り返す</b>」に変わった。</li>
+      <li><b>「3秒で消える」の真因はブラウザのキャッシュ</b>。コードの3秒消灯タイマーは撤去済みだが、<code>index.html</code> に<b>キャッシュバストが無く</b>旧 <code>viewer.js</code> が再利用されていた。→ <code>?v=</code> 付与＋サーバー側 <code>no-store</code> 配信で恒久対処。<b>要・ハード再読み込み</b>。</li>
+      <li><b>マップは「アプリ全量」ではなく、モックアップの代表5フローを写した teaching subset</b>。画面・エンドポイント・テーブルの大半が未登録。「従業員管理を押すと画面もハンドラも出ずfetchから」はこれが原因。</li>
+      <li><b>商品画像の配信はそもそも計測対象外</b>。<code>&lt;img&gt;</code> のリソース読込は <code>fetch</code> を通らず、計測は <code>/api</code> のみのため、画像配信コンポーネントが地図に存在しない。</li>
+    </ol>
+  </div>
+
+  <h2 class="sec" id="s1">① リアルタイム経路アニメ：反復再生（before / after）</h2>
+  <p>1操作（1トレース）が起こす経路を点灯し粒子を流す挙動を、<b>次の操作まで繰り返す</b>よう変更した。</p>
+  <div class="ba">
+    <div class="card before">
+      <h4>Before</h4>
+      <ul>
+        <li>span受信時に粒子を<b>1回だけ</b>放出</li>
+        <li><code>setTimeout(…, 3000)</code> で<b>3秒後に消灯</b></li>
+        <li>操作後しばらくすると地図が暗転</li>
+      </ul>
+    </div>
+    <div class="card after">
+      <h4>After</h4>
+      <ul>
+        <li><code>currentPath</code> に最新経路を保持</li>
+        <li><code>loop()</code> が <code>WAVE_PERIOD</code>(=1200ms) ごとに粒子の波を<b>再放出</b></li>
+        <li>3秒消灯タイマーを<b>撤去</b>。次トレース到着で最新経路に<b>置換</b>、履歴モードで停止</li>
+      </ul>
+    </div>
+  </div>
+  <p>実体：<code>src/web/trace/viewer.js</code> の <code>emitWave()</code> / <code>loop()</code> / <code>lightTrace()</code>。変更履歴は自動実装記録 §9。</p>
+
+  <h2 class="sec" id="s2">② 「3秒でアニメーションが消える」の真因</h2>
+  <p>コード側の3秒消灯（<code>lightTrace</code> 内の <code>setTimeout(…3000)</code>）は<b>すでに撤去済み</b>で、現行 <code>viewer.js</code> には存在しない（残る <code>3000</code> は無関係な <code>pruneTraces</code> のTTLと <code>resizeFx</code> のみ）。それでも「3秒で消える」が続いていた。</p>
+  <h3>真因：ブラウザが旧 viewer.js をキャッシュ再利用</h3>
+  <p><code>index.html</code> は <code>&lt;script src="/static/trace/viewer.js"&gt;</code> を<b>バージョン無し</b>で読み込んでいた。FastAPI の <code>StaticFiles</code> は明示的キャッシュ制御を返さないため、ブラウザが旧JS（3秒消灯あり）をそのまま使い続け、サーバー上のファイルを更新しても画面が変わらなかった。</p>
+  <div class="note"><b>恒久対処（2点）：</b>
+    <ol style="margin:6px 0 0">
+      <li><code>index.html</code> に <code>viewer.js?v=20260618-loop2</code> のキャッシュバストを付与。</li>
+      <li>サーバーで <code>/static/trace/</code> を <code>Cache-Control: no-store</code> 配信（以後の編集が再読み込みで必ず反映）。実体：<code>src/api/main.py</code> のトレースミドルウェア。</li>
+    </ol>
+    ※反映には<b>サーバー再起動＋ブラウザのハード再読み込み（Ctrl+F5）</b>が必要。
+  </div>
+
+  <h2 class="sec" id="s3">③ マップ網羅性の真因と横並び点検</h2>
+  <div class="note"><b>真因（1文）：</b> 経路マップと対応表（<code>trace_map.json</code> の <code>nodes/routes/pages</code>）は、UIモックアップの<b>代表5フロー（catalog/dashboard/login/inventory/orders）を写した teaching subset</b> であり、アプリ全量の棚卸しをしていない。加えて計測は <code>/api</code> のみ・<code>fetch</code> のみが対象で、静的配信（<code>&lt;img&gt;</code> 等）は設計上トレースされない。</div>
+
+  <h3 id="s3a">画面カバレッジ（HTML 10枚 中 5枚のみ登録）</h3>
+  <table>
+    <thead><tr><th>HTMLファイル</th><th>役割</th><th>pages登録</th><th>画面ノード点灯</th><th>判定</th></tr></thead>
+    <tbody>
+      <tr><td><code>store/catalog.html</code></td><td>商品一覧</td><td>catalog</td><td>する</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>store/checkout.html</code></td><td>注文確定</td><td>checkout</td><td>する</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>store/login.html</code></td><td>ストアログイン</td><td>login</td><td>する</td><td><span class="pill warn">同名衝突</span></td></tr>
+      <tr><td><code>admin/login.html</code></td><td>管理ログイン</td><td>login（store と同じ）</td><td>誤ノードへ</td><td><span class="pill warn">同名衝突</span></td></tr>
+      <tr><td><code>admin/dashboard.html</code></td><td>ダッシュボード</td><td>dashPage</td><td>する</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>admin/inventory.html</code></td><td>在庫管理</td><td>inventory</td><td>する</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>store/cart.html</code></td><td>カート</td><td>—</td><td>しない</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>store/history.html</code></td><td>注文履歴</td><td>—</td><td>しない</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>admin/products.html</code></td><td>商品管理</td><td>—</td><td>しない</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>admin/employees.html</code></td><td>従業員管理</td><td>—</td><td>しない</td><td><span class="pill bad">欠落 ←ご指摘の事例</span></td></tr>
+    </tbody>
+  </table>
+  <p class="sub">※ <code>pages</code> はファイル名キー。store と admin の <code>login.html</code> が<b>同名</b>のため同一ノードに解決される設計上の衝突あり。</p>
+
+  <h3 id="s3b">エンドポイント→ハンドラ対応（17本 中 正確5・誤ラベル4・欠落8）</h3>
+  <table>
+    <thead><tr><th>メソッド / パス</th><th>実関数</th><th>点灯するハンドラノード</th><th>判定</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /api/products</code></td><td>list_products</td><td>h_list（list_products）</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>POST /api/auth/store</code></td><td>store_login</td><td>h_slogin</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>POST /api/inventory/adjust</code></td><td>adjust_stock</td><td>h_adj</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>POST /api/orders</code></td><td>create_order</td><td>h_order</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>GET /api/dashboard</code></td><td>dashboard</td><td>h_dash</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>POST /api/products</code></td><td>create_product</td><td>h_list（前方一致で誤って list_products）</td><td><span class="pill warn">誤ラベル</span></td></tr>
+      <tr><td><code>PUT /api/products/{id}</code></td><td>update_product</td><td>h_list（誤）</td><td><span class="pill warn">誤ラベル</span></td></tr>
+      <tr><td><code>GET /api/orders</code></td><td>list_orders</td><td>h_order（create_order と誤同一視）</td><td><span class="pill warn">誤ラベル</span></td></tr>
+      <tr><td><code>GET /api/orders/{id}/details</code></td><td>order_details</td><td>h_order（前方一致で誤）</td><td><span class="pill warn">誤ラベル</span></td></tr>
+      <tr><td><code>POST /api/auth/admin</code></td><td>admin_login</td><td>なし</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>GET /api/categories</code></td><td>list_categories</td><td>なし</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>GET /api/suppliers</code></td><td>list_suppliers</td><td>なし</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>GET /api/shippers</code></td><td>list_shippers</td><td>なし</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>GET /api/employees</code></td><td>list_employees</td><td>なし</td><td><span class="pill bad">欠落 ←事例</span></td></tr>
+      <tr><td><code>GET /api/employees/{id}</code></td><td>get_employee</td><td>なし</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>PUT /api/employees/{id}</code></td><td>update_employee</td><td>なし</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>GET /api/products?…</code>（検索）</td><td>list_products</td><td>h_list</td><td><span class="pill ok">OK</span></td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>「従業員管理を押すと、画面もハンドラも出ずfetchから」の機序：</b>
+  <code>employees.html</code> は <code>pages</code> 未登録→<b>画面ノード点灯せず</b>／<code>GET /api/employees</code> は <code>routes</code> 未登録→<b>ハンドラノード点灯せず</b>／<code>employees</code> テーブルもノード未登録→<b>テーブル点灯せず</b>。結果、点灯するのは <code>fetch・CORS・認証・db・psycopg2</code> だけ＝「いきなりfetchから」。</div>
+
+  <h3 id="s3c">テーブルノード（使用中なのに欠落：employees / shippers）</h3>
+  <table>
+    <thead><tr><th>テーブル</th><th>アプリで使用</th><th>マップノード</th><th>判定</th></tr></thead>
+    <tbody>
+      <tr><td>products / categories / suppliers / orders / order_details / customers</td><td>する</td><td>あり</td><td><span class="pill ok">OK</span></td></tr>
+      <tr><td><code>employees</code></td><td>する（従業員API）</td><td>なし</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td><code>shippers</code></td><td>する（注文一覧・dashboard）</td><td>なし</td><td><span class="pill bad">欠落</span></td></tr>
+      <tr><td>region / territories / us_states / 他</td><td>しない</td><td>なし</td><td><span class="pill ok">対象外で可</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s3d">商品画像コンポーネントの欠落</h3>
+  <p>EC を開くと <code>catalog.html</code> が <code>&lt;img src="/static/img/products/{id}.jpg"&gt;</code> で画像を直接読み込む。これは下図の通り <b>API を経由しない静的配信</b>であり、現状の計測では一切見えない。</p>
+  <div class="flow">
+ブラウザ &lt;img&gt;  ──HTTP(GET /static/img/...)──▶  FastAPI <span class="key">StaticFiles(/static)</span>  ──▶  ファイルシステム <span class="key">src/web/img/products/</span>
+                                              （= 本来あるべき「画像配信」コンポーネント）
+  </div>
+  <p><b>計測されない2つの理由：</b></p>
+  <ol>
+    <li>計測ミドルウェアは <code>path.startswith("/api")</code> のみ span 化 → <code>/static/img/...</code> は記録対象外。</li>
+    <li>フロント計装 <code>trace-client.js</code> は <code>window.fetch</code> だけをパッチ → <code>&lt;img&gt;</code> のリソース読込は <code>fetch</code> を通らず <b>trace_id すら付かない</b>。</li>
+  </ol>
+  <p>結果、「ECを開いた瞬間に画像をファイルから引っ張る」という実際の挙動が、地図にもリアルタイムにも現れない。ご指摘の通り<b>本来コンポーネントとして存在すべき</b>。</p>
+
+  <h2 class="sec" id="s4">④ 推奨対応</h2>
+  <p>マップを「教育用最小」から「アプリ実体に追従」へ引き上げる。粒度の選択肢：</p>
+  <table>
+    <thead><tr><th>案</th><th>内容</th><th>労力</th><th>網羅性</th></tr></thead>
+    <tbody>
+      <tr><td><b>A. 完全カバレッジ（推奨）</b></td><td>全画面を <code>pages</code> に、全エンドポイントを <code>routes</code>＋ハンドラノードに、<code>employees/shippers</code> をテーブルノードに追加。ルート照合を「メソッド+パス」にして誤ラベル解消。画像配信を「静的配信」コンポーネントとして地図に追加し、計測も対応（下記）。</td><td>中〜大</td><td>高</td></tr>
+      <tr><td>C. 中間</td><td>画面・ハンドラ・テーブルは全追加。画像配信は<b>地図に静的表示（非点灯）</b>に留め、計測は将来対応。</td><td>中</td><td>中〜高</td></tr>
+      <tr><td>B. 現状維持＋明示</td><td>代表5フロー固定と割り切り、未収録は「地図外」とUIに注記。</td><td>小</td><td>低</td></tr>
+    </tbody>
+  </table>
+  <div class="rec"><b>推奨：A（または時間制約があれば C）。</b>
+    画像配信を「実際に光る」コンポーネントにするには、<b>trace-client.js で画像読込も検知</b>（例：<code>&lt;img&gt;</code> 生成監視や <code>PerformanceObserver</code> で resource 取得を捕捉し X-Trace-Id 相当を擬似発火）するか、<b>サーバー側で <code>/static/img</code> 配信も span 化</b>する、のいずれか。サーバー側 span 化が最も確実（fetch でなくとも記録できる）。
+  </div>
+  <p class="sub">※ どの案で進めるかは設計判断のため、着手前に確認します（ご指摘の「設計書にも反映」方針に沿い、確定後 <code>要件定義書</code> と <code>trace_map.json</code> の双方を更新します）。</p>
+
+  <h2 class="sec" id="rec">記録先・反映済みの変更</h2>
+  <ul>
+    <li>反復再生の挙動：要件定義書 <code>FR-R2</code> に反映済み／README にも明記済み。</li>
+    <li>キャッシュ対処：<code>index.html</code>（<code>?v=</code>）＋<code>main.py</code>（<code>/static/trace</code> を no-store）反映済み。</li>
+    <li>本報告書：<code>docs/project_management/操作トレース可視化システム_調査報告.html</code>（本ファイル）。</li>
+    <li>マップ拡張（③④）は<b>未着手</b>。上記の案を選んだら実装し、設計書・記録に反映する。</li>
+  </ul>
+
+  <footer>
+    <div><b>出典（このレポートの根拠）</b></div>
+    <ul>
+      <li><code>src/web/trace/viewer.js</code> — 反復再生・点灯ロジック（<code>currentPath</code>/<code>emitWave</code>/<code>loop</code>/<code>nodesForSpan</code>/<code>routeHandler</code>）</li>
+      <li><code>src/api/trace_map.json</code> — <code>nodes</code>(21)/<code>edges</code>(24)/<code>routes</code>(5)/<code>pages</code>(5)</li>
+      <li><code>src/api/main.py</code> — 計測ミドルウェア（<code>/api</code> のみ span 化）、StaticFiles マウント</li>
+      <li><code>src/web/js/trace-client.js</code> — <code>window.fetch</code> パッチ（<code>&lt;img&gt;</code> 非対象）</li>
+      <li><code>src/web/store/catalog.html</code> — <code>/static/img/products/{id}.jpg</code> 参照</li>
+      <li>HTMLファイル一覧（store 5・admin 5）、<code>main.py</code> のエンドポイント定義（17）</li>
+    </ul>
+    <div>最終更新：2026-06-18 ／ 操作トレース可視化システム（ローカル開発環境）</div>
+  </footer>
+</main>
+</div>
+</body>
+</html>

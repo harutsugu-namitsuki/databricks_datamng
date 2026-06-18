@@ -67,6 +67,9 @@ async def trace_middleware(request, call_next):
         response = await call_next(request)
         if response.status_code >= 400:
             status = "error"
+        # 可視化ビューの資産は常に最新を取得させる（編集後の取りこぼし防止）
+        if request.url.path.startswith("/static/trace/"):
+            response.headers["Cache-Control"] = "no-store"
         return response
     except Exception:
         status = "error"
