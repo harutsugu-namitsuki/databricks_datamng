@@ -148,6 +148,8 @@ async function refetchHistory() {
 const fx = document.getElementById("fx");
 const ctx = fx.getContext("2d");
 let particles = [], raf = null;
+let currentPath = null;       // 直近トレースの点灯経路。次の操作が来るまで反復再生する
+const WAVE_PERIOD = 1200;     // この間隔(ms)ごとに経路へ粒子の波を再放出
 
 function resizeFx() {
   const r = svg.getBoundingClientRect();
@@ -165,8 +167,26 @@ function bez(p0, p1, p2, p3, t) {
     y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
   };
 }
+// 1経路ぶんの粒子の「波」を放つ（列順に左→右へ流れる）
+function emitWave(edges, color, now) {
+  edges.forEach(([u, v]) => {
+    const startCol = N[u].col;
+    const a0 = nodePt(u, 1), a3 = nodePt(v, -1);
+    const mx = (a0.x + a3.x) / 2;
+    const a1 = { x: mx, y: a0.y }, a2 = { x: mx, y: a3.y };
+    for (let s = 0; s < 3; s++) {
+      particles.push({ a0, a1, a2, a3, color, start: now + startCol * 180 + s * 90, dur: 520 });
+    }
+  });
+}
+
 function loop() {
   const now = performance.now();
+  // 次の操作が来るまで、現在の経路へ粒子の波を反復放出（追加要件）
+  if (mode === "rt" && currentPath && now >= currentPath.nextWaveAt) {
+    emitWave(currentPath.edges, currentPath.color, now);
+    currentPath.nextWaveAt = now + WAVE_PERIOD;
+  }
   ctx.clearRect(0, 0, fx.width, fx.height);
   const sx = fx._sx, sy = fx._sy;
   particles = particles.filter(p => now < p.start + p.dur);
@@ -182,40 +202,31 @@ function loop() {
   else { raf = null; ctx.clearRect(0, 0, fx.width, fx.height); }
 }
 
-// 1トレース分の点灯（フル経路）＋粒子を放つ
+// 最新トレースのフル経路を点灯し、「次の操作が来るまで反復再生」する対象に設定する。
+// 直前の経路は消し、常に最新の1経路だけを表示・ループさせる。
 function lightTrace(nodeIds, color) {
+  resetNodes(); resetEdges();
   // ノード点灯
   nodeIds.forEach(id => {
     const n = N[id]; if (!n) return;
     n._rect.setAttribute("stroke", color);
     n._rect.setAttribute("fill", color === ERR ? "#3a1f24" : "#243044");
   });
-  // 両端が点灯集合にあるエッジを点灯＋粒子
+  // 両端が点灯集合にあるエッジを点灯し、ループ放出対象として保持
   const litSet = new Set(nodeIds);
   const litEdges = [];
   edgeSet.forEach(k => {
     const i = k.indexOf(">");
     const u = k.slice(0, i), v = k.slice(i + 1);
-    if (litSet.has(u) && litSet.has(v)) litEdges.push([u, v, k]);
-  });
-  const now = performance.now();
-  litEdges.forEach(([u, v, k]) => {
-    const p = edgeEls[k];
-    if (p) { p.setAttribute("stroke", color); p.setAttribute("stroke-width", 3); p.setAttribute("opacity", 1); }
-    const startCol = N[u].col;
-    const a0 = nodePt(u, 1), a3 = nodePt(v, -1);
-    const mx = (a0.x + a3.x) / 2;
-    const a1 = { x: mx, y: a0.y }, a2 = { x: mx, y: a3.y };
-    for (let s = 0; s < 3; s++) {
-      particles.push({ a0, a1, a2, a3, color, start: now + startCol * 260 + s * 90, dur: 520 });
+    if (litSet.has(u) && litSet.has(v)) {
+      litEdges.push([u, v, k]);
+      const p = edgeEls[k];
+      if (p) { p.setAttribute("stroke", color); p.setAttribute("stroke-width", 3); p.setAttribute("opacity", 1); }
     }
   });
+  // 反復再生の対象を最新トレースに更新（次の操作が来ると lightTrace 再呼び出しで置き換わる）
+  currentPath = { edges: litEdges, color, nextWaveAt: performance.now() };
   if (!raf) loop();
-  // 一定時間後にこのトレースの点灯を解除（履歴モードでなければ）
-  clearTimeout(lightTrace._t);
-  lightTrace._t = setTimeout(() => {
-    if (mode === "rt") { resetNodes(); resetEdges(); }
-  }, 3000);
 }
 
 // ===== SSE: trace_id ごとに span を集約しフル経路を計算 =====
@@ -364,6 +375,7 @@ function setMode(m) {
   document.getElementById("hist-tools").style.display = m === "hist" ? "flex" : "none";
   renderLegend();
   if (m === "hist") {
+    currentPath = null;   // 反復再生を停止
     if (raf) { cancelAnimationFrame(raf); raf = null; }
     ctx.clearRect(0, 0, fx.width, fx.height);
     resetNodes();
@@ -374,7 +386,7 @@ function setMode(m) {
   } else {
     resetEdges(); resetNodes(); resizeFx(); loop();
     document.getElementById("detail").innerHTML =
-      "アプリを操作すると、その1クリックが起こす経路が点灯し <b>粒子</b> が流れます。失敗は赤で表示されます。";
+      "アプリを操作すると、その1クリックが起こす経路が点灯し <b>粒子</b> が流れます（<b>次の操作が来るまで繰り返し再生</b>）。失敗は赤で表示されます。";
   }
 }
 
@@ -436,7 +448,7 @@ async function init() {
   resizeFx();
   renderLegend();
   document.getElementById("detail").innerHTML =
-    "アプリを操作すると、その1クリックが起こす経路が点灯し <b>粒子</b> が流れます。失敗は赤で表示されます。";
+    "アプリを操作すると、その1クリックが起こす経路が点灯し <b>粒子</b> が流れます（<b>次の操作が来るまで繰り返し再生</b>）。失敗は赤で表示されます。";
   loop();
   connectSSE();
 }
