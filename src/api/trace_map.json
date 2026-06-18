@@ -572,6 +572,486 @@
           ]
         ]
       }
+    },
+    "cart": {
+      "col": 0,
+      "label": "cart.html",
+      "sub": "カート",
+      "detail": {
+        "k": "画面 (HTML)",
+        "f": "src/web/store/cart.html",
+        "one": "購入予定の商品をためておく“買い物カゴ”の画面。",
+        "easy": "カートの中身は主に<span class='term' title='ブラウザ内にデータを保存する仕組み'>localStorage</span>というブラウザの保存箱で管理され、サーバーには毎回送りません。<b>「注文する」を押して確定したときだけ</b>、まとめて注文APIへ送られます。",
+        "terms": [
+          [
+            "localStorage",
+            "ローカルストレージ",
+            "ブラウザの中にデータを保存しておく仕組み。閉じても残る。"
+          ],
+          [
+            "カート",
+            "―",
+            "購入予定の商品を一時的にためる仕組み。"
+          ]
+        ]
+      }
+    },
+    "history": {
+      "col": 0,
+      "label": "history.html",
+      "sub": "注文履歴",
+      "detail": {
+        "k": "画面 (HTML)",
+        "f": "src/web/store/history.html",
+        "one": "自分が過去にした注文の一覧と中身を見る画面。",
+        "easy": "開くと<b>GET /api/orders</b>で注文の一覧を取り、選んだ注文の<span class='term' title='注文に含まれる商品1行ごとの内訳'>明細</span>も追加で取りに行きます。1画面の表示でも裏では複数の問い合わせが走ります。",
+        "terms": [
+          [
+            "GET",
+            "ゲット",
+            "サーバーからデータを“もらう”通信の種類。"
+          ],
+          [
+            "明細",
+            "めいさい",
+            "注文に含まれる商品1行ごとの内訳。"
+          ]
+        ]
+      }
+    },
+    "adminLogin": {
+      "col": 0,
+      "label": "login.html",
+      "sub": "管理ログイン",
+      "detail": {
+        "k": "画面 (HTML)",
+        "f": "src/web/admin/login.html",
+        "one": "管理者（中の人）がログインする入口の画面。",
+        "easy": "お客様用ではなく<b>管理者用のログイン画面</b>です。入力した管理者IDとパスワードをサーバーへ送り、OKなら通行証(<span class='term' title='ログイン成功の証となる文字列の通行証'>トークン</span>)が発行されます。",
+        "terms": [
+          [
+            "トークン",
+            "―",
+            "ログイン成功の証として発行される通行証の文字列。"
+          ],
+          [
+            "admin",
+            "アドミン",
+            "管理者・運営側のこと。"
+          ]
+        ]
+      }
+    },
+    "productsPage": {
+      "col": 0,
+      "label": "products.html",
+      "sub": "商品管理(admin)",
+      "detail": {
+        "k": "画面 (HTML)",
+        "f": "src/web/admin/products.html",
+        "one": "管理者が商品を追加・更新する管理用の画面。",
+        "easy": "商品の<b>新規作成や更新</b>を行い、入力の助けとしてカテゴリ一覧や仕入先一覧も取りに行きます。書き込み操作なので<span class='term' title='「あなたは誰か」を確認する仕組み'>認証</span>（ログイン）が必要です。",
+        "terms": [
+          [
+            "認証",
+            "にんしょう",
+            "「あなたは誰か」を確認する仕組み。ログインがこれ。"
+          ],
+          [
+            "マスタ",
+            "―",
+            "商品・カテゴリなど基準となる台帳データ。"
+          ]
+        ]
+      }
+    },
+    "employeesPage": {
+      "col": 0,
+      "label": "employees.html",
+      "sub": "従業員管理(admin)",
+      "detail": {
+        "k": "画面 (HTML)",
+        "f": "src/web/admin/employees.html",
+        "one": "管理者が従業員情報を一覧・編集する管理用の画面。",
+        "easy": "従業員の<b>一覧表示・詳細確認・更新</b>を行う管理者向けの画面です。個人情報を扱うため<span class='term' title='「あなたは誰か」を確認する仕組み'>認証</span>が必須で、権限によっては一部の項目が隠されます。",
+        "terms": [
+          [
+            "認証",
+            "にんしょう",
+            "「あなたは誰か」を確認する仕組み。"
+          ],
+          [
+            "マスキング",
+            "―",
+            "個人情報など一部を伏せ字にして見せないこと。"
+          ]
+        ]
+      }
+    },
+    "h_alogin": {
+      "col": 4,
+      "label": "admin_login",
+      "sub": "POST /auth/admin",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py admin_login()",
+        "one": "管理者ログインの可否を判定し通行証を発行する担当プログラム。",
+        "easy": "<b>ここはデータベースを使いません</b>。プログラムの中にあらかじめ書いた固定の管理者リスト(<span class='term' title='メモリ上に直書きされた管理者アカウント一覧'>ADMIN_USERS</span>)と入力を照合し、合えばトークンを発行します。だから他のハンドラと違い<b>db.pyへ行きません</b>。これは“DBに行かない経路もある”ことを学ぶ良い例です。",
+        "terms": [
+          [
+            "ADMIN_USERS",
+            "アドミンユーザーズ",
+            "プログラム内に直書きされた管理者アカウントの一覧。"
+          ],
+          [
+            "メモリ",
+            "―",
+            "プログラムが動作中に使う一時的な記憶領域。DBと違い保存はされない。"
+          ],
+          [
+            "照合",
+            "しょうごう",
+            "入力が登録内容と一致するか突き合わせること。"
+          ]
+        ]
+      }
+    },
+    "h_pcreate": {
+      "col": 4,
+      "label": "create_product",
+      "sub": "POST /api/products",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py create_product()",
+        "one": "新しい商品を登録する担当プログラム（要ログイン）。",
+        "easy": "管理者から送られた商品情報を、<span class='term' title='新しいデータを追加するSQL命令'>INSERT</span>で products 表に1行追加します。書き込み操作なので<span class='term' title='通行証を確認する仕組み'>認証</span>を必ず通ります。",
+        "terms": [
+          [
+            "INSERT",
+            "インサート",
+            "新しいデータを“追加する”SQL命令。"
+          ],
+          [
+            "認証",
+            "にんしょう",
+            "通行証を確認してログイン済みか確かめる仕組み。"
+          ]
+        ],
+        "sql": "INSERT INTO products (product_name, category_id, supplier_id, unit_price, ...) VALUES (...)"
+      }
+    },
+    "h_pupdate": {
+      "col": 4,
+      "label": "update_product",
+      "sub": "PUT /api/products/{id}",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py update_product()",
+        "one": "既存の商品を書き換える担当プログラム（要ログイン）。",
+        "easy": "URLで指定された商品IDの行を、送られた内容で<span class='term' title='既存データを書き換えるSQL命令'>UPDATE</span>します。<span class='term' title='対象を更新するHTTPの操作。POSTが新規ならPUTは更新'>PUT</span>は“まるごと更新”を表す通信の種類です。",
+        "terms": [
+          [
+            "UPDATE",
+            "アップデート",
+            "既存データを“書き換える”SQL命令。"
+          ],
+          [
+            "PUT",
+            "プット",
+            "対象を更新するHTTPの操作。POSTが新規作成、PUTが更新。"
+          ]
+        ],
+        "sql": "UPDATE products SET product_name=%s, category_id=%s, ... WHERE product_id=%s"
+      }
+    },
+    "h_categories": {
+      "col": 4,
+      "label": "list_categories",
+      "sub": "GET /api/categories",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py list_categories()",
+        "one": "商品カテゴリの一覧を返す担当プログラム（公開）。",
+        "easy": "誰でも呼べる<span class='term' title='ログイン無しで呼べる窓口'>公開API</span>で、categories 表から分類名の一覧を読み出して返します。だから改札(認証)を通りません。",
+        "terms": [
+          [
+            "公開API",
+            "こうかいエーピーアイ",
+            "ログイン無しで誰でも呼べる窓口。"
+          ],
+          [
+            "SELECT",
+            "セレクト",
+            "データを“読み出す”SQL命令。"
+          ]
+        ],
+        "sql": "SELECT category_id, category_name FROM categories ORDER BY category_name"
+      }
+    },
+    "h_suppliers": {
+      "col": 4,
+      "label": "list_suppliers",
+      "sub": "GET /api/suppliers",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py list_suppliers()",
+        "one": "仕入先企業の一覧を返す担当プログラム（公開）。",
+        "easy": "こちらも<span class='term' title='ログイン無しで呼べる窓口'>公開API</span>。suppliers 表から会社名の一覧を読み出します。商品管理画面の入力候補として使われます。",
+        "terms": [
+          [
+            "公開API",
+            "こうかいエーピーアイ",
+            "ログイン無しで誰でも呼べる窓口。"
+          ],
+          [
+            "マスタ",
+            "―",
+            "仕入先など基準となる台帳データ。"
+          ]
+        ],
+        "sql": "SELECT supplier_id, company_name FROM suppliers ORDER BY company_name"
+      }
+    },
+    "h_shippers": {
+      "col": 4,
+      "label": "list_shippers",
+      "sub": "GET /api/shippers",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py list_shippers()",
+        "one": "配送業者の一覧を返す担当プログラム（公開）。",
+        "easy": "<span class='term' title='ログイン無しで呼べる窓口'>公開API</span>で、shippers 表から配送業者名の一覧を読み出します。注文の発送方法を選ぶときに使います。",
+        "terms": [
+          [
+            "公開API",
+            "こうかいエーピーアイ",
+            "ログイン無しで誰でも呼べる窓口。"
+          ],
+          [
+            "配送業者",
+            "はいそうぎょうしゃ",
+            "商品を顧客へ届ける運送会社。"
+          ]
+        ],
+        "sql": "SELECT shipper_id, company_name FROM shippers ORDER BY shipper_id"
+      }
+    },
+    "h_emplist": {
+      "col": 4,
+      "label": "list_employees",
+      "sub": "GET /api/employees",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py list_employees()",
+        "one": "従業員の一覧を返す担当プログラム（要ログイン）。",
+        "easy": "従業員という個人情報を扱うため<span class='term' title='通行証を確認する仕組み'>認証</span>が必要です。employees 表から氏名・役職などをまとめて読み出して返します。",
+        "terms": [
+          [
+            "認証",
+            "にんしょう",
+            "通行証を確認してログイン済みか確かめる仕組み。"
+          ],
+          [
+            "SELECT",
+            "セレクト",
+            "データを“読み出す”SQL命令。"
+          ]
+        ],
+        "sql": "SELECT employee_id, last_name, first_name, title, ... FROM employees ORDER BY employee_id"
+      }
+    },
+    "h_empget": {
+      "col": 4,
+      "label": "get_employee",
+      "sub": "GET /api/employees/{id}",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py get_employee()",
+        "one": "従業員1名の詳細を返す担当プログラム（要ログイン）。",
+        "easy": "指定IDの従業員を1行読み出します。ただし<b>管理者(admin)以外には生年月日や電話番号を伏せ字に</b>します。これを<span class='term' title='個人情報など一部を伏せて見せないこと'>マスキング</span>と言い、見る人の<span class='term' title='その人に許された操作の範囲'>権限</span>で出し分けます。",
+        "terms": [
+          [
+            "マスキング",
+            "―",
+            "個人情報など一部を伏せ字にして見せないこと。"
+          ],
+          [
+            "権限",
+            "けんげん",
+            "その人に許された操作・閲覧の範囲。roleで区別する。"
+          ]
+        ],
+        "sql": "SELECT employee_id, last_name, first_name, ..., birth_date, home_phone, notes FROM employees WHERE employee_id=%s"
+      }
+    },
+    "h_empupdate": {
+      "col": 4,
+      "label": "update_employee",
+      "sub": "PUT /api/employees/{id}",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py update_employee()",
+        "one": "従業員情報を書き換える担当プログラム（要ログイン）。",
+        "easy": "指定IDの従業員の行を、送られた内容で<span class='term' title='既存データを書き換えるSQL命令'>UPDATE</span>します。個人情報の変更なので<span class='term' title='通行証を確認する仕組み'>認証</span>を通ります。",
+        "terms": [
+          [
+            "UPDATE",
+            "アップデート",
+            "既存データを“書き換える”SQL命令。"
+          ],
+          [
+            "PUT",
+            "プット",
+            "対象を更新するHTTPの操作。"
+          ]
+        ],
+        "sql": "UPDATE employees SET first_name=%s, last_name=%s, title=%s, ... WHERE employee_id=%s"
+      }
+    },
+    "h_olist": {
+      "col": 4,
+      "label": "list_orders",
+      "sub": "GET /api/orders",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py list_orders()",
+        "one": "ログイン中の顧客の注文一覧を返す担当プログラム（要ログイン）。",
+        "easy": "自分の注文だけを見せるため<span class='term' title='通行証を確認する仕組み'>認証</span>が必要です。orders を中心に order_details や shippers を<span class='term' title='複数の表を共通項目でつなげる操作'>JOIN</span>し、注文ごとに<span class='term' title='合計や件数にまとめる計算'>集約</span>して返します。",
+        "terms": [
+          [
+            "JOIN",
+            "ジョイン",
+            "複数の表を共通項目でつなげて1つにする操作。"
+          ],
+          [
+            "GROUP BY",
+            "グループバイ",
+            "指定した項目ごとにまとめて集計するSQL句。"
+          ],
+          [
+            "集約",
+            "しゅうやく",
+            "合計・件数などにまとめる計算。"
+          ]
+        ],
+        "sql": "SELECT o.order_id, o.order_date, ..., sh.company_name FROM orders o LEFT JOIN order_details od ON ... LEFT JOIN shippers sh ON o.ship_via=sh.shipper_id WHERE o.customer_id=%s GROUP BY ..."
+      }
+    },
+    "h_odetails": {
+      "col": 4,
+      "label": "order_details",
+      "sub": "GET /api/orders/{id}/details",
+      "detail": {
+        "k": "APIハンドラ（担当プログラム）",
+        "f": "src/api/main.py order_details()",
+        "one": "1つの注文の中身（明細）を返す担当プログラム（要ログイン）。",
+        "easy": "指定された注文IDの<span class='term' title='注文に含まれる商品1行ごとの内訳'>明細</span>を、order_details と products を<span class='term' title='複数の表を共通項目でつなげる操作'>JOIN</span>して商品名つきで読み出します。自分の注文を見るので<span class='term' title='通行証を確認する仕組み'>認証</span>が必要です。",
+        "terms": [
+          [
+            "明細",
+            "めいさい",
+            "注文に含まれる商品1行ごとの内訳（数量・単価・割引）。"
+          ],
+          [
+            "JOIN",
+            "ジョイン",
+            "複数の表を共通項目でつなげる操作。"
+          ]
+        ],
+        "sql": "SELECT p.product_name, od.unit_price, od.quantity, od.discount, ... FROM order_details od LEFT JOIN products p ON od.product_id=p.product_id WHERE od.order_id=%s"
+      }
+    },
+    "t_employees": {
+      "col": 7,
+      "label": "employees",
+      "sub": "従業員",
+      "detail": {
+        "k": "テーブル（表）",
+        "f": "northwind.employees",
+        "one": "従業員マスタ。氏名・役職・連絡先などの“社員台帳”。",
+        "easy": "社員1人＝1行で持つ<span class='term' title='滅多に増減しない基準データ'>マスタ</span>です。生年月日や電話など個人情報も含むため、見る人の権限で一部を伏せて出します。",
+        "terms": [
+          [
+            "マスタ",
+            "―",
+            "基準となる台帳データ。社員・商品など。"
+          ],
+          [
+            "個人情報",
+            "こじんじょうほう",
+            "個人を特定できる情報。扱いに注意が必要。"
+          ]
+        ]
+      }
+    },
+    "t_shippers": {
+      "col": 7,
+      "label": "shippers",
+      "sub": "配送業者",
+      "detail": {
+        "k": "テーブル（表）",
+        "f": "northwind.shippers",
+        "one": "配送業者マスタ。商品を届ける運送会社の台帳。",
+        "easy": "発送方法を表す小さな<span class='term' title='滅多に増減しない基準データ'>マスタ</span>です。orders 表が ship_via という番号でこの表を指し示し、JOINで業者名を引いてきます。",
+        "terms": [
+          [
+            "マスタ",
+            "―",
+            "基準となる台帳データ。"
+          ],
+          [
+            "配送業者",
+            "はいそうぎょうしゃ",
+            "商品を顧客へ届ける運送会社。"
+          ]
+        ]
+      }
+    },
+    "img_static": {
+      "col": 4,
+      "label": "静的配信",
+      "sub": "StaticFiles",
+      "detail": {
+        "k": "静的配信（ディスク直返し）",
+        "f": "src/api/main.py StaticFiles(/static)",
+        "one": "画像などのファイルを、API処理を通さずそのまま返す仕組み。",
+        "easy": "<span class='term' title='静的ファイル(画像/CSS/JS)をディスクからそのまま配信するFastAPIの仕組み'>StaticFiles</span>は、プログラムの処理を介さず<b>ディスク上のファイルをそのまま返す</b>“静的配信”です。<span class='term' title='HTMLで画像を表示するタグ'>&lt;img&gt;</span>の読み込みはfetchを通らないため、各画像が独立した1本のトレースになります。",
+        "terms": [
+          [
+            "StaticFiles",
+            "―",
+            "静的ファイル(画像/CSS/JS)をディスクからそのまま配信するFastAPIの仕組み"
+          ],
+          [
+            "静的配信",
+            "せいてきはいしん",
+            "プログラム処理を介さずファイルをそのまま返すこと"
+          ]
+        ]
+      }
+    },
+    "img_file": {
+      "col": 7,
+      "label": "画像ファイル",
+      "sub": "img/products",
+      "detail": {
+        "k": "画像ファイル（ディスク）",
+        "f": "src/web/img/products/",
+        "one": "商品画像(1.jpg…)を保管しているフォルダ。",
+        "easy": "商品画像の実体が置かれた場所です。catalog 画面が <span class='term' title='HTMLで画像を表示するタグ'>&lt;img src=\"/static/img/products/{id}.jpg\"&gt;</span> でこのフォルダの画像を参照します。DBではなくファイルとして持ちます。",
+        "terms": [
+          [
+            "img",
+            "イメージ",
+            "HTMLで画像を表示するタグ。srcに画像の場所を書く。"
+          ],
+          [
+            "ファイル",
+            "―",
+            "ディスク上に保存されたデータのまとまり。"
+          ]
+        ]
+      }
     }
   },
   "edges": [
@@ -670,20 +1150,156 @@
     [
       "h_order",
       "db"
+    ],
+    [
+      "cart",
+      "fetch"
+    ],
+    [
+      "history",
+      "fetch"
+    ],
+    [
+      "adminLogin",
+      "fetch"
+    ],
+    [
+      "productsPage",
+      "fetch"
+    ],
+    [
+      "employeesPage",
+      "fetch"
+    ],
+    [
+      "cors",
+      "h_categories"
+    ],
+    [
+      "cors",
+      "h_suppliers"
+    ],
+    [
+      "cors",
+      "h_shippers"
+    ],
+    [
+      "cors",
+      "h_alogin"
+    ],
+    [
+      "auth",
+      "h_pcreate"
+    ],
+    [
+      "auth",
+      "h_pupdate"
+    ],
+    [
+      "auth",
+      "h_emplist"
+    ],
+    [
+      "auth",
+      "h_empget"
+    ],
+    [
+      "auth",
+      "h_empupdate"
+    ],
+    [
+      "auth",
+      "h_olist"
+    ],
+    [
+      "auth",
+      "h_odetails"
+    ],
+    [
+      "h_categories",
+      "db"
+    ],
+    [
+      "h_suppliers",
+      "db"
+    ],
+    [
+      "h_shippers",
+      "db"
+    ],
+    [
+      "h_pcreate",
+      "db"
+    ],
+    [
+      "h_pupdate",
+      "db"
+    ],
+    [
+      "h_emplist",
+      "db"
+    ],
+    [
+      "h_empget",
+      "db"
+    ],
+    [
+      "h_empupdate",
+      "db"
+    ],
+    [
+      "h_olist",
+      "db"
+    ],
+    [
+      "h_odetails",
+      "db"
+    ],
+    [
+      "pg",
+      "t_employees"
+    ],
+    [
+      "pg",
+      "t_shippers"
+    ],
+    [
+      "catalog",
+      "img_static"
+    ],
+    [
+      "img_static",
+      "img_file"
     ]
   ],
   "routes": {
-    "/api/products": "h_list",
-    "/api/dashboard": "h_dash",
-    "/api/auth/store": "h_slogin",
-    "/api/inventory/adjust": "h_adj",
-    "/api/orders": "h_order"
+    "POST /api/auth/admin": "h_alogin",
+    "POST /api/auth/store": "h_slogin",
+    "GET /api/products": "h_list",
+    "POST /api/products": "h_pcreate",
+    "PUT /api/products/": "h_pupdate",
+    "GET /api/categories": "h_categories",
+    "GET /api/suppliers": "h_suppliers",
+    "GET /api/shippers": "h_shippers",
+    "POST /api/inventory/adjust": "h_adj",
+    "GET /api/employees": "h_emplist",
+    "GET /api/employees/": "h_empget",
+    "PUT /api/employees/": "h_empupdate",
+    "POST /api/orders": "h_order",
+    "GET /api/orders": "h_olist",
+    "GET /api/orders/": "h_odetails",
+    "GET /api/dashboard": "h_dash"
   },
   "pages": {
-    "catalog.html": "catalog",
-    "checkout.html": "checkout",
-    "inventory.html": "inventory",
-    "dashboard.html": "dashPage",
-    "login.html": "login"
+    "store/catalog.html": "catalog",
+    "store/checkout.html": "checkout",
+    "store/cart.html": "cart",
+    "store/history.html": "history",
+    "store/login.html": "login",
+    "admin/login.html": "adminLogin",
+    "admin/dashboard.html": "dashPage",
+    "admin/products.html": "productsPage",
+    "admin/inventory.html": "inventory",
+    "admin/employees.html": "employeesPage"
   }
 }
